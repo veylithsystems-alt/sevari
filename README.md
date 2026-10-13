@@ -1,1 +1,109 @@
-# sevari
+# Sevari BDI — sevari-core
+
+The operations layer for service businesses: it takes in every enquiry, works out what's true, replies, books, bills and keeps the records. It automates everything that can lawfully be automated, and hands everything else to a human with the facts already gathered.
+
+Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md) (v1.9). If the code and the contract disagree, the code is wrong or the contract needs amending.
+
+---
+
+## For Dan: where things stand (plain English)
+
+**Last updated:** 13 October 2026 · **Branch:** `claude/sevari-core-build`
+
+| Phase | What it is | Status |
+|---|---|---|
+| 0 | Project skeleton, automatic checks, every contract test written | ✅ Done |
+| 1 | The secure database: businesses can never see each other's data, data stays in its region, the tamper-proof record, encryption | ✅ Done |
+| 2 | Receiving enquiries (web form, email, SMS), the outbound-connection guard, the supplier list | Next |
+| 3 | The rules engine: what the customer wants, prices, areas, availability, bookings | Planned |
+| 4 | The instant acknowledgement, and the fact-checker that stops made-up prices or dates | Planned |
+| 5 | The local AI models and how they're scored | Planned |
+| 18 → 6 | Your approvals: questions to you, one-tap approve, nothing sends without it | Planned |
+| 7 | Privacy: erasure, data requests, retention, the consent record | Planned |
+| 8 | Measurements and weekly reports | Planned |
+| 9+ | Lifecycle, missed-call texts, finance, complaints, offboarding, learning, hardening | Planned |
+
+**What's proven so far (each one is an automatic test that runs on every change):**
+- One business can never read, change or delete another business's data, even if the code has a bug. The database itself enforces it.
+- Data can't be written to another region unless a human-recorded transfer agreement allows it.
+- The tamper-proof record really is tamper-proof. The tests attack it with full database admin rights; even rewriting the whole history is caught by a signature kept outside the database.
+- Personal details are encrypted with each business's own key. Destroying that key makes the data unreadable for good.
+- The app refuses to start if any safety check fails.
+
+**Things I found that you should know:**
+- Your old n8n build (v3.6 / v4.1) has 16 bugs I've written up in [`docs/reference/v4.1-behaviours.md`](docs/reference/v4.1-behaviours.md). The serious ones: the "tamper-proof" record could be changed without detection; an approval for one message could be used to send a different one; the approval page could run attacker-supplied code; the encryption step stored data unencrypted if its key was missing; and the erasure step failed with an error. The new build is designed so each of these can't happen, and has a test for each.
+- My suggested improvements to the contract are in [`docs/CONTRACT_REVIEW.md`](docs/CONTRACT_REVIEW.md). You decide; nothing changes without you.
+- Questions only you can answer are in [`docs/QUESTIONS_FOR_DAN.md`](docs/QUESTIONS_FOR_DAN.md). None of them block the next phases.
+
+---
+
+## Technical overview
+
+### Principles (contract §1, §3)
+- **Deterministic core, model for wording.** Code decides *what* is said; a local model only decides *how*. Every outbound fact is grounded or the draft is blocked.
+- **Sovereign cells.** Each region is its own cell (database, workers, inference, keys, egress allowlist). Region #2 is config and data, not code.
+- **Floors are tests.** Each invariant (INV-1 … INV-19) is enforced by a test that blocks CI.
+- **Human decisions are typed records** that must have a consumer and an effect receipt (§30). Silence never approves.
+
+### Layout
+```
+apps/                 api, worker, owner-ui (from Phase 2)
+packages/
+  domain/             pure deterministic core: ids, action classes, canonical JSON, normalisers (no I/O; lint-enforced)
+  clock/              the only source of time (lint-enforced)
+  db/                 migrations, RLS machinery, tenant sessions, schema introspection
+  crypto/             KMS port, envelope encryption, blind indexes, rotation, crypto-shred
+  audit/              append, verify, signed checkpoints
+  region/             region rule packs, live-tenant gate, cell routing
+  egress/             allowlist (default deny); the only package allowed to make network calls
+  privacy/            erasure registry (INV-6)
+  boot/               boot guard (INV-9)
+config/
+  regions/uk.yaml     UK rule pack (counsel_signoff: null until counsel signs)
+  egress.allowlist.yaml
+tests/
+  contract/registry.ts  every contract test id, its phase and section
+  contract/phases.json  phases claimed delivered (the CI gate enforces their tests)
+  phase0/ phase1/ ...   the tests
+tools/eslint-plugin-sevari  the contract §4 lint rules
+docs/                 contract, review, deviations, ADRs, reference behaviours
+```
+
+### Database security model (Phase 1)
+- Two roles: `sevari_owner` runs migrations; `sevari_app` is what the services use (`NOBYPASSRLS`, owns nothing, least privilege per table).
+- Every table has RLS **enabled and forced**. Tenant tables use one policy: `tenant_id = app.tenant_id AND region = app.region`, with writes to other regions only under an active `region_transfer_contracts` row (INV-2) that only the owner role can create.
+- Context is set with `set_config(..., true)` inside `withTenant()`, so it's transaction-local and safe with connection pools and PgBouncer transaction pooling.
+- Every tenant table has `UNIQUE (tenant_id, id)`, and children use composite foreign keys, so cross-tenant references are impossible.
+- The owner role has no policy on tenant tables, so even the migration role reads zero tenant rows.
+- **Audit chain:** a database trigger assigns `seq`, `prev_hash` and `hash = SHA-256(prev_hash ‖ canonical row)`, serialised per tenant chain; UPDATE/DELETE/TRUNCATE are refused for every role. `sevari_meta.audit_verify()` recomputes the chain, and Ed25519-signed checkpoints (key outside the database) catch a full rewrite. Audit payloads may not contain personal data.
+- **Encryption:** per-tenant data and blind-index keys, wrapped by the cell KEK (local key file in v1, behind a `Kms` port). AES-256-GCM with associated data binding each ciphertext to tenant, region, table, column and row. Rotation keeps old versions readable; crypto-shred is irreversible (a trigger refuses to un-shred).
+
+### Running it
+Requirements: Node 22, pnpm 10, PostgreSQL 16 (or Docker for Testcontainers).
+
+```bash
+pnpm install
+pnpm typecheck && pnpm lint
+
+# Tests need a Postgres superuser URL, or Docker:
+export SEVARI_TEST_DATABASE_URL=$(pnpm -s db:local)   # starts a local Postgres 16 on :54329
+pnpm test:gate        # what CI enforces: every test of every delivered phase must pass
+pnpm test:all         # everything, including red tests for phases not built yet
+pnpm contract:status  # table of contract tests: implemented? phase delivered?
+```
+
+### CI (`.github/workflows/ci.yml`)
+- `secrets`: gitleaks on the full history (INV-10).
+- `gate`: typecheck, lint (with the contract rules), fallback secret scan, and the gate suite against Postgres 16.
+- `contract-progress`: every contract test, red included, plus the status table. Informational.
+
+### Contract test status
+Run `pnpm contract:status` for the live table. At the end of Phase 1: F1, F4, T-AUD, T-BOOT, T-MIG, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
+
+### Documents
+- [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md): the binding contract (v1.9)
+- [`docs/CONTRACT_REVIEW.md`](docs/CONTRACT_REVIEW.md): proposed amendments
+- [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md): every difference from the contract, with reasons
+- [`docs/QUESTIONS_FOR_DAN.md`](docs/QUESTIONS_FOR_DAN.md): open decisions
+- [`docs/reference/v4.1-behaviours.md`](docs/reference/v4.1-behaviours.md): behaviours and defects from the n8n builds
+- [`docs/adr/`](docs/adr/): architecture decisions (dependencies, Temporal-ready workflow port)
