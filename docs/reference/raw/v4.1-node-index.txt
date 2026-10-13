@@ -1,0 +1,582 @@
+webhook            IN:API                                   POST /sync/ingest/api
+webhook            IN:Form                                  POST /sync/ingest/form
+webhook            IN:Email                                 POST /sync/ingest/email
+webhook            IN:Widget                                GET /sync/widget/v1
+webhook            IN:Task                                  POST /sync/task
+webhook            IN:Webhook                               POST /sync/ingest/webhook
+webhook            IN:Legacy                                POST /operion/ingest/api
+merge              IN:Merge                                 
+postgres           WGT:ValidateKey                          SELECT w.*, b.status FROM widget_keys w JOIN businesses b ON w.business_id=b.business_id WHERE w.emb
+code               IN:HMAC                                  1667ch
+postgres           IN:EarlyRateCheck                         -- FIX 3: Rate limiting using window_minute column with proper unique index -- Index: CREATE UNIQUE
+postgres           IN:IPCheck                               SELECT id FROM ip_blocklist WHERE ip_address=$1 AND (expires_at IS NULL OR expires_at > NOW()) LIMIT
+code               IN:Normalise                             2712ch
+postgres           IN:PG:QueueWrite                         INSERT INTO enquiry_queue (enquiry_id, business_id, subject, body_encrypted, channel,   sender_name,
+postgres           IN:PG:QueueInsert                        SELECT $1 as queue_id, $2 as enquiry_id -- Queue already written atomically in previous step
+respondToWebhook   INTAKE:ACK                               
+scheduleTrigger    WRK:Trigger                              {"interval": [{"field": "cronExpression", "expression": "*/15 * * * * *"}]}
+postgres           WRK:Lock                                  -- IMPROVEMENT 1: Age-weighted priority -- Enquiries older than 2 minutes get effective priority bo
+postgres           WRK:Dequeue                              SELECT e.*, eq.queue_id, b.tier, b.operating_mode, b.customer_type, b.communication_style, b.industr
+code               WRK:BuildEnvelope                        341ch
+scheduleTrigger    WRK:RetryTrigger                         {"interval": [{"field": "cronExpression", "expression": "*/5 * * * *"}]}
+postgres           WRK:RetryStuck                            -- FIXED ISSUE 11: Exponential backoff in retry logic UPDATE enquiry_queue SET   status = 'queued',
+postgres           WRK:ToDLQ                                 UPDATE enquiry_queue SET    status='dlq',   dlq_reason = CASE      WHEN processing_deadline < NOW()
+code               GRD:Scan                                 2484ch
+code               GRD:AiPrep                               1549ch
+code               GRD:AiScan                               1356ch
+code               GRD:AiEval                               822ch
+if                 GRD:Gate                                 
+respondToWebhook   GRD:Block                                
+postgres           GRD:Quarantine                           INSERT INTO quarantine_queue (enquiry_id, business_id, guardian_score, threat_types, payload_hash, i
+postgres           GRD:Audit                                INSERT INTO guardian_audit (enquiry_id,business_id,threat_types_detected,threat_score,action,ip_addr
+code               SEC:EncryptPII                           2352ch
+code               CRED:PrepKeyLookup                       206ch
+postgres           CRED:PG:KeyLookup                        SELECT k.key_type, k.is_active, b.tier, b.status, b.operating_mode, b.user_type, b.customer_type, b.
+if                 CRED:Gate                                
+code               CRED:TierEnforce                         582ch
+code               CORE:Validate                            247ch
+if                 CORE:ValGate                             
+respondToWebhook   CRED:Reject                              
+postgres           SEC:PII:Audit                            INSERT INTO pii_audit (enquiry_id,business_id,pii_types_detected,action,fields_affected,key_version)
+code               TCL:InitTrajectory                       425ch
+postgres           TCL:PG:Init                              INSERT INTO trajectory_state (trajectory_id,action_id,business_id,intent_hash,original_intent_hash,i
+code               INT:CIL:DetectSource                     327ch
+postgres           INT:CIL:AuthResolver                     SELECT credentials_encrypted, auth_method, base_url_encrypted, rate_limit_per_minute, cost_per_call_
+code               INT:CIL:RateLimiter                      456ch
+code               INT:CIL:PayloadNormaliser                689ch
+code               SVR:Detect                               114ch
+postgres           SVR:ThreadLookup                          -- FIX 6: Thread lookup uses sender_email_hash (SHA-256 of normalised plaintext email) -- Not MD5 o
+if                 SVR:Route                                
+postgres           SER:PG:Classify                          SELECT category_name, keywords, sla_hours FROM enquiry_categories WHERE business_id=$1 ORDER BY prio
+code               CORE:Classify                            769ch
+code               RAG:Prep                                 118ch
+httpRequest        RAG:Embed                                {"method": "POST", "url": "={{ $vars.SYNC_VPS2_HOST }}/api/embeddings", "sendBody": true, "body": {"mode": "json", "json": "{\"model\":\"nomic-embed-text\",\"prompt\":\"{{ $json.rag_query }}\"}"}, "op
+postgres           RAG:PG:Search                            SELECT title, content_encrypted, 1-(embedding <=> $1::vector) as similarity    FROM knowledge_embedd
+code               RAG:Process                              2475ch
+code               HIVE:Context                             1079ch
+code               CE:AssessNeed                            4275ch
+if                 CE:Gate                                  
+code               SER:T0:Prep                              1717ch
+code               SER:T0:Call                              1485ch
+code               SER:T0:Confidence                        961ch
+if                 SER:T0:Gate                              
+code               SER:T1:Prep                              112ch
+code               SER:T1:Call                              1485ch
+code               SER:T1:Confidence                        961ch
+if                 SER:T1:Gate                              
+code               SER:T2:Prep                              97ch
+code               SER:T2:Call                              1485ch
+if                 SER:T2:Gate                              
+code               SER:T3:Prep                              95ch
+code               SER:T3:Call                              1451ch
+if                 SER:T3:Gate                              
+code               SER:T4:Prep                              95ch
+code               SER:T4:Call                              1451ch
+if                 SER:T4:Gate                              
+postgres           SER:PG:Templates                         SELECT template_text, variables FROM response_templates WHERE business_id=$1 AND (action_type=$2 OR 
+code               SER:T5:Apply                             575ch
+code               SER:T6:Escalate                          181ch
+merge              OG:Merge                                 
+code               OG:ConfScore                             961ch
+code               OG:DriftCheck                            1987ch
+code               SEC:RespGuard                            1489ch
+code               QA:Check                                 470ch
+postgres           SLA:Check                                SELECT CASE WHEN EXTRACT(EPOCH FROM (NOW() - e.created_at))/3600 > sc.response_sla_minutes/60.0 THEN
+code               SVR:Switch                               91ch
+code               SVR:FORGE:Prep                           965ch
+code               SVR:HERALD:Prep                          1412ch
+code               SVR:VANGUARD:Prep                        965ch
+code               SVR:BASTION:Prep                         471ch
+code               SVR:LEDGER:Prep                          969ch
+code               SVR:COMPASS:Prep                         932ch
+code               SVR:SENTINEL:Prep                        1615ch
+merge              SVR:AgentMerge                           
+code               AGT:T0:Call                              1711ch
+code               AGT:T1:Call                              1696ch
+code               AGT:T5:Template                          505ch
+merge              AGT:OutputMerge                          
+code               ACT:GateCheck                            4883ch
+if                 ACT:ExecGate                             
+postgres           ACT:PG:QueueApproval                     INSERT INTO approval_queue (business_id,approver_role,approver_mobile,action_type,agent_name,enquiry
+code               SMS:Prep                                 484ch
+twilio             SMS:Send                                 {"operation": "send", "from": "={{ $vars.SYNC_TWILIO_FROM }}", "to": "={{ $json.owner_mobile }}", "message": "={{ $json.sms_message }}"}
+postgres           SMS:Log                                  INSERT INTO sms_log (approval_id,direction,to_number,message_body,status) VALUES ($1,'outbound',$2,$
+code               SMS:FallbackCheck                        170ch
+postgres           SMS:FallbackLog                          INSERT INTO sms_fallback_log (approval_id,sms_attempt_count,last_sms_status) VALUES ($1,1,'sent')
+code               SMS:ParseReply                           245ch
+postgres           SMS:ValidateToken                        UPDATE approval_queue SET status='processing_approval' WHERE approval_token=($1::uuid) AND status='p
+if                 SMS:RoleCheck                            
+postgres           SMS:DoApprove                            UPDATE approval_queue SET status='approved', decided_at=NOW(), decided_via='sms' WHERE approval_id=$
+postgres           SMS:DoReject                             UPDATE approval_queue SET status='rejected', decided_at=NOW(), decided_via='sms' WHERE approval_id=$
+webhook            SMS:SwipePage                            GET /sync/approve
+postgres           SMS:SwipeTokenLookup                     SELECT approval_id, business_id, action_type, action_preview, status FROM approval_queue WHERE appro
+code               SMS:SwipePage:Render                     2065ch
+webhook            SMS:SwipeAction                          POST /sync/approve/action
+postgres           SMS:SwipeProcess                         UPDATE approval_queue SET status=CASE WHEN $1='approve' THEN 'approved' ELSE 'rejected' END, decided
+postgres           ECO:Registry                             INSERT INTO engine_performance (business_id,engine_name,date_window,success_count,fail_count,avg_dur
+code               HIVE:Learn                               712ch
+postgres           HIVE:PG:Patterns                         INSERT INTO hive_patterns (business_id,pattern_type,category,agent_name,tier_used,success,approval_o
+code               OUT:ChainHash                            471ch
+postgres           OUT:PG:Audit                             INSERT INTO audit_trail (enquiry_id, business_id, step_name, step_status, detail,   confidence_raw, 
+postgres           OUT:PG:AiLog                             INSERT INTO ai_decision_log (enquiry_id,business_id,engine_name,model_name,tier_number,prompt_hash,o
+postgres           TCL:Summary                              INSERT INTO trajectory_summary (trajectory_id,total_steps,drift_events,final_score,outcome_status,co
+postgres           OUT:PG:Update                            UPDATE enquiries SET status='complete', response_text=$1, current_tier=$2, completed_at=NOW() WHERE 
+postgres           OUT:PG:QueueDone                         UPDATE enquiry_queue SET status='done', updated_at=NOW() WHERE enquiry_id=$1
+code               OUT:DemoRespond                          325ch
+code               OUT:Final                                1552ch
+webhook            OP:Init                                  POST /sync/init
+code               OP:InitLogic                             244ch
+respondToWebhook   OP:InitRespond                           
+webhook            OP:Demo                                  POST /sync/demo/run
+code               OP:DemoPrep                              312ch
+webhook            OP:Health                                GET /sync/health/public
+code               OP:HealthLogic                           135ch
+respondToWebhook   OP:HealthRespond                         
+webhook            OP:Selftest                              GET /sync/selftest
+postgres           OP:ST:DB                                 SELECT COUNT(*) as tbl_count FROM information_schema.tables WHERE table_schema='public'
+respondToWebhook   OP:ST:Respond                            
+webhook            OP:Phase                                 GET /sync/phase
+postgres           OP:Phase:Read                            SELECT phase, phase_name FROM marketing_phase ORDER BY id DESC LIMIT 1
+respondToWebhook   OP:Phase:Respond                         
+webhook            OP:Waitlist                              POST /sync/waitlist
+postgres           OP:WL:Insert                             INSERT INTO waitlist (email, source, phase_joined, tier_interest) VALUES ($1, $2, $3, $4) ON CONFLIC
+respondToWebhook   OP:WL:Respond                            
+webhook            STR:Webhook                              POST /sync/stripe
+code               STR:Process                              558ch
+postgres           STR:Provision                            INSERT INTO businesses (business_id, business_name, owner_email, tier,   stripe_customer_id, stripe_
+postgres           STR:EventLog                             INSERT INTO stripe_events (stripe_event_id,event_type,payload,processed) VALUES ($1,$2,$3,true)
+webhook            OP:Dashboard                             GET /sync/dashboard
+postgres           OP:DashData                              SELECT     (SELECT COUNT(*) FROM enquiries WHERE business_id=$1 AND created_at > NOW()-INTERVAL '24 
+respondToWebhook   OP:DashRespond                           
+webhook            ADMIN:Dashboard                          GET /sync/admin/dashboard
+code               ADMIN:AuthCheck                          851ch
+if                 ADMIN:Gate                               
+respondToWebhook   ADMIN:403                                
+postgres           ADMIN:Data                               SELECT     (SELECT COUNT(*) FROM businesses WHERE status='active') as active_tenants,     (SELECT CO
+respondToWebhook   ADMIN:Respond                            
+scheduleTrigger    SCH:HIVE                                 {"interval": [{"field": "cronExpression", "expression": "*/10 * * * *"}]}
+postgres           HIVE:Aggregate                           SELECT business_id, pattern_type, category, COUNT(*) as count, AVG(confidence_score * EXP(-EXTRACT(E
+code               HIVE:Analyse                             5847ch
+scheduleTrigger    SCH:SENTINEL                             {"interval": [{"field": "cronExpression", "expression": "*/5 * * * *"}]}
+code               SENTINEL:Health                          91ch
+postgres           SENTINEL:QueueLog                        INSERT INTO queue_depth_log (enquiry_queue_depth,task_queue_depth,dlq_depth,email_queue_depth,approv
+httpRequest        SENTINEL:VPS2Check                       {"method": "GET", "url": "={{ $vars.SYNC_VPS2_HOST }}/api/tags", "sendBody": true, "body": {"mode": "json", "json": "={{ $json }}"}, "options": {}}
+code               SENTINEL:VPS2Update                      100ch
+postgres           SENTINEL:VPS2DB                          UPDATE admin_config SET config_value=$1, updated_at=NOW() WHERE config_key='vps2_status'
+scheduleTrigger    SCH:AuditVerify                          {"interval": [{"field": "cronExpression", "expression": "0 * * * *"}]}
+postgres           SENTINEL:AuditVerify                     SELECT audit_id, prev_hash, row_hash, business_id, timestamp FROM audit_trail ORDER BY timestamp DES
+code               SENTINEL:AuditChain                      601ch
+scheduleTrigger    SCH:BriefScheduler                       {"interval": [{"field": "cronExpression", "expression": "*/5 * * * *"}]}
+postgres           SCH:BriefData                             -- Read per-tenant brief preferences -- Only fire if: brief_enabled=true AND NOW() matches their ch
+code               SCH:BriefBuild                           1471ch
+emailSend          SCH:BriefAM:Send                         {"fromEmail": "={{ $vars.SYNC_FROM_EMAIL }}", "toEmail": "={{ $json.to_address }}", "subject": "={{ $json.subject }}", "message": "={{ $json.body_html }}", "options": {}, "jsCode": ""}
+scheduleTrigger    SCH:BriefPM:Deprecated                   {"interval": [{"field": "cronExpression", "expression": "0 3 29 2 *"}]}
+postgres           SCH:BriefPM:Data                         SELECT b.business_id, b.owner_email, b.business_name,     (SELECT COUNT(*) FROM enquiries e WHERE e.
+code               SCH:BriefPM:Build                        362ch
+emailSend          SCH:BriefPM:Send                         {"fromEmail": "={{ $vars.SYNC_FROM_EMAIL }}", "toEmail": "={{ $json.to_address }}", "subject": "={{ $json.subject }}", "message": "={{ $json.body_html }}", "options": {}}
+scheduleTrigger    SCH:HERALD                               {"interval": [{"field": "cronExpression", "expression": "0 6 * * *"}]}
+code               SCH:HERALD:Generate                      921ch
+scheduleTrigger    SCH:Email                                {"interval": [{"field": "cronExpression", "expression": "*/2 * * * *"}]}
+postgres           EMAIL:Fetch                              UPDATE email_queue SET status='sending' WHERE email_id=(SELECT email_id FROM email_queue WHERE statu
+emailSend          EMAIL:SMTP                               {"fromEmail": "={{ $vars.SYNC_FROM_EMAIL }}", "toEmail": "={{ $json.to_address }}", "subject": "={{ $json.subject }}", "message": "={{ $json.body_html }}", "options": {}}
+postgres           EMAIL:MarkSent                           UPDATE email_queue SET status='sent', sent_at=NOW() WHERE email_id=$1
+scheduleTrigger    SCH:EKP                                  {"interval": [{"field": "cronExpression", "expression": "0 */6 * * *"}]}
+postgres           EKP:SelectBiz                            SELECT business_id, business_name, industry FROM businesses WHERE status='active' AND (SELECT COUNT(
+scheduleTrigger    SCH:Maintenance                          {"interval": [{"field": "cronExpression", "expression": "0 0 * * *"}]}
+postgres           SCH:Maint:Purge                          DELETE FROM replay_cache WHERE expires_at < NOW();    DELETE FROM response_cache WHERE expires_at < 
+scheduleTrigger    SCH:ApprovalAge                          {"interval": [{"field": "cronExpression", "expression": "0 */1 * * *"}]}
+postgres           SCH:ApprovalAge:Check                    INSERT INTO approval_age_log (approval_id,business_id,approver_role,created_at,age_hours,notified_24
+errorTrigger       ERR:Trigger                              
+code               ERR:Handler                              193ch
+postgres           ERR:PG:Log                               INSERT INTO system_events (event_type,severity,source_node,detail) VALUES ('error','error',$1,$2)
+code               HIVE:ConstitutionCheck                   1559ch
+postgres           HIVE:ConstitutionViolationLog            INSERT INTO constitution_violation_log (rec_id,constant_name,violation_type,rec_summary,auto_rejecte
+if                 HIVE:ConstitutionGate                    
+postgres           HIVE:WriteRecs                           INSERT INTO hive_recommendations (business_id,rec_type,recommendation_json,justification,status,appr
+postgres           EKP:CacheCheck                           SELECT ekp_id, raw_data, processed_summary, last_fetched_at FROM ekp_data    WHERE business_id=$1 AN
+httpRequest        EKP:CompaniesHouse                       {"method": "GET", "url": "=https://api.company-information.service.gov.uk/search/companies?q={{ encodeURIComponent($json.business_name) }}&items_per_page=3", "sendBody": true, "body": {"mode": "json",
+httpRequest        EKP:GooglePlaces                         {"method": "GET", "url": "=https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input={{ encodeURIComponent($json.business_name) }}&inputtype=textquery&fields=name,rating,formatted_addres
+httpRequest        EKP:OpenStreetMap                        {"method": "GET", "url": "=https://nominatim.openstreetmap.org/search?q={{ encodeURIComponent($json.business_name) }}&format=json&limit=2&addressdetails=1", "sendBody": true, "body": {"mode": "json", 
+httpRequest        EKP:Wikipedia                            {"method": "GET", "url": "=https://en.wikipedia.org/api/rest_v1/page/summary/{{ encodeURIComponent($json.industry || \"small business\") }}", "sendBody": true, "body": {"mode": "json", "json": "={{ $j
+httpRequest        EKP:ONS                                  {"method": "GET", "url": "=https://api.beta.ons.gov.uk/v1/datasets?limit=5&q={{ encodeURIComponent($json.industry || \"\") }}", "sendBody": true, "body": {"mode": "json", "json": "={{ $json }}"}, "opt
+code               EKP:OllamaAnalyse                        757ch
+postgres           EKP:Store                                INSERT INTO ekp_data (business_id, source, raw_data, processed_summary, last_fetched_at, is_embedded
+postgres           EKP:KBInsert                             INSERT INTO knowledge_base (business_id, title, content_encrypted, kb_type, is_active, ekp_sourced) 
+code               HIVE:AuthorityScore                      834ch
+postgres           RAG:PG:ScopedSearch                      SELECT kb.title, kb.content_encrypted, kb.source_system, kb.authority_weight, kb.external_hash, kb.r
+postgres           EKP:Checkpoint                           INSERT INTO ekp_checkpoints (job_id, chunk_index, chunk_hash, embedded)    VALUES ($1, $2, $3, true)
+postgres           EKP:JobUpdate                            UPDATE ekp_ingestion_jobs    SET processed_chunks = processed_chunks + 1, last_checkpoint = $1, stat
+postgres           EKP:ResumeCheck                          SELECT job_id, last_checkpoint, total_chunks, status FROM ekp_ingestion_jobs    WHERE business_id = 
+scheduleTrigger    SCH:SENTINEL:Veracity                    {"interval": [{"field": "cronExpression", "expression": "*/5 * * * *"}]}
+postgres           SENTINEL:VeracityCheck                   SELECT kb.kb_id, kb.business_id, kb.title, kb.updated_at, kb.external_hash, kb.source_system, kb.aut
+code               SENTINEL:VeracityFlag                    276ch
+postgres           SENTINEL:VeracityUpdate                  UPDATE knowledge_base SET is_stale = true, staleness_checked_at = NOW(), refresh_queued = true    WH
+postgres           SENTINEL:VeracityRefreshTask             INSERT INTO tasks (business_id, target_agent, task_type, subject, priority, status)    VALUES ($1, '
+code               INT:CIL:KnowledgeBridge                  1313ch
+code               IN:RateLimitEnforce                      546ch
+respondToWebhook   IN:RateBlock                             
+if                 IN:RateGate                              
+postgres           IN:RateBlockLog                          UPDATE rate_limit_log SET blocked_count = blocked_count + 1 WHERE business_id=$1 AND window_start = 
+code               IN:BackpressureCheck                     1554ch
+postgres           IN:QueueDepthRead                        SELECT       (SELECT COUNT(*) FROM enquiry_queue WHERE status='queued') as enquiry_queue_depth,     
+scheduleTrigger    SCH:DLQMonitor                           {"interval": [{"field": "cronExpression", "expression": "*/5 * * * *"}]}
+postgres           DLQ:Check                                SELECT     COUNT(*) as dlq_count,     MAX(created_at) as oldest_dlq,     ARRAY_AGG(eq.enquiry_id ORD
+if                 DLQ:AlertGate                            
+postgres           DLQ:LogEvent                             INSERT INTO system_events (event_type, severity, source_node, detail)    VALUES ('dlq_items_detected
+postgres           DLQ:Recover                              UPDATE enquiry_queue    SET status = 'queued', retry_count = 0, locked_at = NULL, locked_by = NULL, 
+postgres           DLQ:Notify                               INSERT INTO email_queue (to_address_encrypted, subject, body_text, email_type, status)    VALUES (  
+code               CIRCUIT:Breaker                          908ch
+postgres           CIRCUIT:FailureCount                      SELECT   COUNT(*) as recent_failures,   (SELECT config_value FROM admin_config WHERE config_key = '
+postgres           CIRCUIT:Log                              INSERT INTO system_events (event_type, severity, source_node, business_id, detail)    SELECT 'circui
+webhook            OBS:MetricsEndpoint                      GET /sync/metrics
+postgres           OBS:MetricsData                          SELECT     (SELECT COUNT(*) FROM enquiries WHERE created_at > NOW() - INTERVAL '1 hour') as enquirie
+code               OBS:MetricsFormat                        992ch
+respondToWebhook   OBS:MetricsRespond                       
+code               INT:CIL:FallbackOrchestrator             1402ch
+postgres           INT:CIL:UpdateReliability                UPDATE external_integrations    SET reliability_score = $1,        updated_at = NOW()    WHERE busin
+postgres           STR:CreateApiKey                         -- Create ingest API key for new tenant WITH new_key AS (   SELECT     gen_random_uuid()::text as ra
+postgres           STR:CreateWidgetKey                      -- Create widget key for new tenant INSERT INTO widget_keys (business_id, embed_key, allowed_domains
+postgres           STR:SetupOnboarding                      -- Create onboarding state and operating mode INSERT INTO onboarding_state (business_id, stage, comp
+postgres           STR:SeedCategories                       -- Seed universal starter categories for new tenant INSERT INTO enquiry_categories (business_id, cat
+code               STR:WelcomePrep                          7296ch
+emailSend          STR:WelcomeEmail                         {"fromEmail": "={{ $vars.SYNC_FROM_EMAIL }}", "toEmail": "={{ $json.to_address }}", "subject": "={{ $json.subject }}", "message": "={{ $json.body_html }}", "options": {}}
+postgres           STR:WelcomeFlag                          UPDATE onboarding_state SET welcome_email_sent = true WHERE business_id = $1
+postgres           STR:LogAcknowledgement                   -- Log the activation acknowledgement to the audit-level record -- This is the legal evidence that t
+postgres           STR:AckAudit                             INSERT INTO audit_trail (business_id, step_name, step_status, detail, prev_hash, row_hash) VALUES ( 
+code               CE:FollowUpDetect                        1228ch
+postgres           CE:ClearFlag                             UPDATE threads    SET awaiting_clarification = false, clarification_sent_at = NULL, clarification_qu
+postgres           CE:SetFlag                               UPDATE threads    SET awaiting_clarification = true,        clarification_sent_at = NOW(),        cl
+if                 CE:FollowUpGate                          
+webhook            OB:AckWebhook                            POST /sync/onboarding/acknowledge
+postgres           OB:PrePaymentLog                         INSERT INTO activation_acknowledgements (   stripe_session_id, subscriber_email, tier, checkbox_text
+postgres           OB:PrePaymentAudit                       INSERT INTO audit_trail (business_id, step_name, step_status, detail, prev_hash, row_hash) VALUES ( 
+respondToWebhook   OB:AckRespond                            
+if                 IN:HMACGate                              
+respondToWebhook   IN:HMACReject                            
+if                 IN:ShedGate                              
+respondToWebhook   IN:ShedRespond                           
+if                 IN:NormaliseGate                         
+respondToWebhook   IN:NormaliseReject                       
+code               INT:CIL:ConnectorRouter                  1269ch
+code               INT:CIL:ExecutionBridge                  5847ch
+postgres           INT:CIL:ResponseCapture                   -- INT:CIL:ResponseCapture — always writes, even on failure (Architecture v2.0 requirement) INSERT 
+code               SENTINEL:CertCheck                       901ch
+postgres           SENTINEL:CertLog                          INSERT INTO system_events (event_type, severity, source_node, detail) SELECT   'cert_check',   CASE
+postgres           SENTINEL:DBConnCheck                      INSERT INTO system_events (event_type, severity, source_node, detail) SELECT   'db_connection_count
+postgres           HIVE:Lock                                 -- CI-03 mitigation: atomic concurrency lock for HIVE:Aggregate -- If another instance is running, 
+if                 HIVE:LockGate                            
+postgres           HIVE:Unlock                              DELETE FROM concurrency_locks WHERE lock_name='hive_aggregate'
+postgres           SENTINEL:AuditGapLog                      INSERT INTO audit_gap_log (detected_at, expected_prev_hash, actual_prev_hash, gap_position, severit
+webhook            API:EnquiriesWH                          GET /sync/enquiries
+postgres           API:EnquiriesWH:Data                     SELECT e.enquiry_id, e.subject, e.category, e.status, e.created_at,        e.response_text as respon
+respondToWebhook   API:EnquiriesRespond                     
+webhook            API:ApprovalsWH                          GET /sync/approvals
+postgres           API:ApprovalsWH:Data                     SELECT aq.approval_id, aq.enquiry_id, aq.approval_token, aq.status,        aq.action_type, aq.risk_l
+respondToWebhook   API:ApprovalsRespond                     
+webhook            API:KBGetWH                              GET /sync/kb
+postgres           API:KBGetWH:Data                         SELECT kb_id, title, kb_type, source_system, authority_weight, is_stale,        left(content_encrypt
+respondToWebhook   API:KBRespond                            
+webhook            API:ProfileWH                            PATCH /sync/profile
+postgres           API:ProfileWH:Data                       UPDATE businesses SET   business_name=COALESCE(NULLIF($1,''),business_name),   owner_email=COALESCE(
+respondToWebhook   API:ProfileRespond                       
+webhook            API:SettingsWH                           PATCH /sync/settings
+postgres           API:SettingsWH:Data                      UPDATE businesses SET   operating_mode=COALESCE(NULLIF($1,''),operating_mode),   updated_at=NOW() WH
+respondToWebhook   API:SettingsRespond                      
+code               STR:InvoiceGen                           6975ch
+emailSend          STR:InvoiceEmail                         {"fromEmail": "={{ $vars.SYNC_FROM_EMAIL }}", "toEmail": "={{ $json.owner_email || $json.customer_email }}", "subject": "={{ 'Your Sevari invoice \u2014 ' + $json.invoice_number }}", "message": "={{ $
+postgres           ADMIN:DashDataFull                        SELECT   -- Revenue   (SELECT COUNT(*) FROM businesses WHERE status='active') as active_tenants,   
+postgres           ADMIN:HIVEPending                         SELECT hr.recommendation_id, hr.business_id, b.business_name, hr.category,        hr.recommendation
+respondToWebhook   WGT:Respond                              
+respondToWebhook   WGT:Reject                               
+if                 WGT:Gate                                 
+if                 WRK:DeadlineGate                         
+code               WRK:DeadlineForceT5                      621ch
+postgres           OUT:ThreadWriteback                      INSERT INTO threads (   thread_id, business_id, sender_email_hash, last_enquiry_id,   last_body, las
+postgres           LOG:GUARDIAN_PASSED                      INSERT INTO system_events (event_type, severity, source_node, business_id, detail, timestamp) VALUES
+postgres           LOG:QA_COMPLETE                          INSERT INTO system_events (event_type, severity, source_node, business_id, detail, timestamp) VALUES
+postgres           LOG:RESPONSE_SENT                        INSERT INTO system_events (event_type, severity, source_node, business_id, detail, timestamp) VALUES
+code               EKP:Done                                 82ch
+code               SEC:DecryptForAI                         2756ch
+if                 SEC:DecryptGate                          
+code               SEC:ValidateNoPIILeak                    741ch
+webhook            FRP:Trigger                              POST /sync/first-run/trigger
+postgres           FRP:CheckStatus                          SELECT business_id,first_run_completed,first_run_at FROM businesses WHERE business_id=$1 LIMIT 1
+if                 FRP:CheckGate                            
+respondToWebhook   FRP:AlreadyDone                          
+code               FRP:GenerateEnquiry                      2138ch
+postgres           FRP:InjectToQueue                        INSERT INTO enquiries (enquiry_id,business_id,subject,body_encrypted,channel,sender_name,sender_emai
+code               FRP:CallPipeline                         947ch
+postgres           FRP:CaptureResult                        INSERT INTO first_run_results(business_id,enquiry_id,generated_response,model_used,category,confiden
+postgres           FRP:FetchAudit                           SELECT step_name,step_status,confidence_adjusted,detail,timestamp FROM audit_trail WHERE enquiry_id=
+postgres           FRP:MarkComplete                         UPDATE businesses SET first_run_completed=true,first_run_at=NOW(),updated_at=NOW() WHERE business_id
+code               FRP:BuildPayload                         1742ch
+respondToWebhook   FRP:Respond                              
+webhook            FRP:PollWebhook                          GET /sync/first-run/result
+postgres           FRP:PollFetch                            SELECT frr.*,b.business_name,b.industry,b.first_run_completed,b.first_run_at FROM first_run_results 
+respondToWebhook   FRP:PollRespond                          
+code               SVR:BASTION:Call                         2318ch
+code               SVR:VANGUARD:Call                        2319ch
+code               SVR:HERALD:Call                          2303ch
+code               SVR:COMPASS:Call                         2314ch
+code               SVR:LEDGER:Call                          2325ch
+code               SVR:FORGE:Call                           2313ch
+postgres           CIL:RegistryFetch                        SELECT integration_type,provider_name,connector_category,   capabilities,status,reliability_score,pr
+code               CIL:RegistryMerge                        2258ch
+postgres           CRED:TaskCount                            SELECT COUNT(*) as monthly_task_count FROM enquiries WHERE business_id = $1   AND created_at >= dat
+code               CRED:TaskMerge                           152ch
+code               CE:GatherContext                         2068ch
+code               ACT:ConnectorBlock                       1728ch
+code               ACT:Dispatch                             1983ch
+postgres           CIL:ResolveConnector                     SELECT ei.integration_id,ei.integration_type,ei.provider_name, ei.connector_category,ei.capabilities
+if                 CIL:ResolveGate                          
+code               ACT:CapabilityCheck                      742ch
+code               EXEC:WebhookFallback                     979ch
+code               EXEC:Run                                 2127ch
+postgres           EXEC:AuditResult                         INSERT INTO audit_trail(enquiry_id,business_id,step_name,step_status,detail,   confidence_raw,trajec
+code               WGT:SessionCreate                        535ch
+postgres           WGT:SessionStore                         INSERT INTO sessions(session_id,business_id,channel,started_at,last_active_at,consent_logged) VALUES
+webhook            WGT:PollWebhook                          GET /sync/widget/response
+postgres           WGT:PollFetch                            SELECT e.enquiry_id,e.response_text as response,e.category,e.status,s.session_id FROM enquiries e JO
+respondToWebhook   WGT:PollRespond                          
+webhook            SMS:InboundWebhook                       POST /sync/sms/inbound
+code               SMS:InboundNormalise                     778ch
+postgres           SMS:LookupBusiness                       SELECT b.business_id,b.business_name,b.tier,b.operating_mode,b.industry FROM businesses b JOIN busin
+respondToWebhook   SMS:InboundAck                           
+twilio             SMS:OutboundSend                         {"operation": "create", "from": "={{ $vars.SYNC_TWILIO_FROM }}", "to": "={{ $json.recipient_mobile||$json.from_phone }}", "message": "={{ ($json.final_output||'').substring(0,160) }}", "options": {}}
+postgres           SMS:OutboundLog                          INSERT INTO sms_fallback_log(enquiry_id,business_id,recipient_phone_hash,   message_preview,send_sta
+webhook            GDPR:ErasureWebhook                      POST /sync/gdpr/erasure
+postgres           GDPR:ErasureExecute                      UPDATE enquiries SET body_encrypted='[ERASED]',sender_name='[ERASED]',   sender_email_hash='ERASED-'
+respondToWebhook   GDPR:ErasureRespond                      
+webhook            GDPR:ExportWebhook                       POST /sync/gdpr/export
+postgres           GDPR:ExportFetch                         SELECT json_build_object('export_type','gdpr_data_export','exported_at',NOW(),   'business_id',$1,'e
+respondToWebhook   GDPR:ExportRespond                       
+postgres           SENTINEL:PIIKeyCheck                     INSERT INTO system_events(event_type,severity,source_node,detail,timestamp) SELECT 'pii_key_rotation
+postgres           SENTINEL:ApprovalAge                     INSERT INTO approval_age_log(approval_id,business_id,action_type,risk_level,age_hours,alert_level,lo
+postgres           SENTINEL:CostControl                     INSERT INTO system_events(event_type,severity,source_node,business_id,detail,timestamp) SELECT 'exte
+code               CIL:ConnectorDiscovery                   662ch
+webhook            API:ConnStatusWH                         GET /sync/connector-status
+postgres           API:ConnStatusFetch                      SELECT integration_type,provider_name,connector_category,status,capabilities,   reliability_score,(c
+respondToWebhook   API:ConnStatusRespond                    
+postgres           STR:WaiverAudit                          INSERT INTO activation_acknowledgements(business_id,session_id,tier,checkbox_text_shown,   acknowled
+code               HIVE:SuggestionEngine                    1848ch
+postgres           HIVE:SuggestionStore                     INSERT INTO hive_recommendations(business_id,category,recommendation_text,confidence,   evidence_cou
+postgres           SENTINEL:DegradedMode                    UPDATE businesses SET degraded_mode=CASE WHEN tier_failure_rate>0.8 THEN true ELSE false END,updated
+code               EXEC:ConnectorFallback                   586ch
+stickyNote         DOC:ConcurrencyLimits                    
+stickyNote         DOC:KBIngestionPipeline                  
+postgres           CONC:ExecutionCheck                      UPDATE concurrency_counters             SET current_count = current_count + 1, updated_at = NOW()   
+code               CONC:ExecutionGate                       399ch
+postgres           CONC:ExecutionRelease                    UPDATE concurrency_counters             SET current_count = GREATEST(0, current_count - 1), updated_
+postgres           CONC:AIAcquire                           UPDATE concurrency_counters             SET current_count = current_count + 1, updated_at = NOW()   
+postgres           CONC:AIRelease                           UPDATE concurrency_counters             SET current_count = GREATEST(0, current_count - 1), updated_
+scheduleTrigger    SCH:StaleLockRecovery                    {"interval": [{"field": "seconds", "secondsInterval": 60}]}
+postgres           STALE:FindLocked                         UPDATE enquiry_queue             SET locked_at = NULL,                 worker_id = NULL,            
+code               STALE:AuditLog                           387ch
+postgres           STALE:PGAudit                            INSERT INTO audit_trail (event_type, enquiry_id, event_data, created_at)             VALUES ('stale_
+postgres           GRD:BlocklistInsert                      INSERT INTO ip_blocklist (sender_key, reason, expires_at, created_at, threat_score)             VALU
+postgres           CIL:CostLog                              INSERT INTO external_cost_log (business_id, action_id, cost_estimate_pence, cost_actual_pence, exter
+code               ACT:ContractValidate                     545ch
+postgres           IN:ReplayCheck                           SELECT enquiry_id FROM enquiries WHERE ingestion_fingerprint = $1 AND created_at > NOW() - INTERVAL 
+code               IN:ReplayGate                            510ch
+stickyNote         DOC:ReplayIndexRequired                  
+scheduleTrigger    SCH:WaitlistPreLaunch                    {"interval": [{"field": "cronExpression", "expression": "0 8 25 7 *"}]}
+postgres           WL:PreLaunch:Fetch                       SELECT email, tier_interest, waitlist_id FROM waitlist             WHERE contacted_prelaunch_at IS N
+code               WL:PreLaunch:Queue                       4187ch
+postgres           WL:PreLaunch:Enqueue                     INSERT INTO email_queue (to_address, subject, body_html, body_text, email_type, priority, status, sc
+scheduleTrigger    SCH:WaitlistLaunchDay                    {"interval": [{"field": "cronExpression", "expression": "0 9 1 8 *"}]}
+postgres           WL:Launch:Fetch                          SELECT wl.email, wl.tier_interest, wl.waitlist_id             FROM waitlist wl             LEFT JOIN
+code               WL:Launch:Queue                          1990ch
+postgres           WL:Launch:Enqueue                        INSERT INTO email_queue (to_address, subject, body_html, body_text, email_type, priority, status, sc
+scheduleTrigger    SCH:EKPWebsite                           {"interval": [{"field": "minutes", "minutesInterval": 15}]}
+postgres           EKP:Website:SelectPending                SELECT business_id, business_name, website_url             FROM businesses             WHERE website
+httpRequest        EKP:Website:Fetch                        {"method": "GET", "url": "={{$json.website_url}}", "options": {"timeout": 30000, "response": {"response": {"responseFormat": "text"}}, "redirect": {"redirect": {"followRedirects": true, "maxRedirects"
+code               EKP:Website:Extract                      1864ch
+httpRequest        EKP:Website:OllamaAnalyse                {"method": "POST", "url": "=http://{{$vars.SYNC_VPS2_HOST || \"vps2-internal\"}}:11434/api/generate", "sendBody": true, "bodyParameters": {"parameters": [{"name": "model", "value": "mistral:7b-instruc
+code               EKP:Website:BuildDrafts                  3131ch
+code               EKP:Website:InsertDrafts                 282ch
+postgres           EKP:Website:PGInsert                     INSERT INTO knowledge_base (business_id, title, content_encrypted, kb_type, is_active, ekp_sourced, 
+postgres           EKP:Website:MarkComplete                 UPDATE businesses SET website_scraped_at = NOW() WHERE business_id = $1;
+scheduleTrigger    SCH:HealthSnapshot                       {"interval": [{"field": "seconds", "secondsInterval": 60}]}
+httpRequest        SYS:HC:AICheck                           {"method": "GET", "url": "=http://{{$vars.SYNC_VPS2_HOST || \"vps2-internal\"}}:11434/api/tags", "options": {"timeout": 2500}}
+code               SYS:HC:MeasureAI                         489ch
+postgres           SYS:HC:QueueCheck                        SELECT               COUNT(*) FILTER (WHERE status='queued') AS queue_depth,               COUNT(*) 
+code               SYS:HC:ComputeState                      753ch
+postgres           SYS:HC:Store                             INSERT INTO system_health (snapshot_at, ai_healthy, queue_depth, processing_count, dlq_count, state,
+postgres           IN:TenantLimit:Check                     INSERT INTO business_runtime_limits (business_id, window_minute, requests_count, active_executions) 
+code               IN:TenantLimit:Gate                      678ch
+postgres           IN:TenantLimit:ConcCheck                 SELECT COUNT(*) AS processing_count             FROM enquiry_queue             WHERE business_id = $
+if                 IN:TenantLimit:ConcGate                  
+code               URG:Detect                               4937ch
+code               URG:Apply                                694ch
+scheduleTrigger    SCH:BGWorker                             {"interval": [{"field": "cronExpression", "expression": "*/30 * * * * *"}]}
+postgres           BG:Pickup:Query                          UPDATE background_tasks SET status='processing', picked_up_at=NOW(), attempts=attempts+1 WHERE task_
+code               BG:Pickup                                600ch
+code               BG:Route                                 672ch
+code               BG:Complete                              746ch
+postgres           BG:UpdateStatus                          UPDATE background_tasks SET status=$1, attempts=$2, completed_at=$3, error_detail=$4, scheduled_for=
+webhook            ONB:Webhook                              POST /sync/onboarding
+code               ONB:Route                                636ch
+postgres           ONB:Questions:Get                        SELECT * FROM onboarding_questions ORDER BY question_order ASC;
+postgres           ONB:Answer:Save                          INSERT INTO onboarding_answers (business_id, question_id, answer_text) VALUES ($1, $2, $$ $3 $$) ON 
+postgres           ONB:Status:Get                           SELECT b.business_id,   (SELECT COUNT(*) FROM onboarding_questions WHERE required=true) AS required_
+code               ONB:CheckComplete                        917ch
+postgres           ONB:Complete:Set                         UPDATE businesses SET onboarding_completed_at=NOW(), onboarding_questions_answered=$1, go_live_block
+postgres           ONB:Seed:Fetch                           SELECT a.answer_id, a.answer_text, q.kb_target_category FROM onboarding_answers a JOIN onboarding_qu
+code               ONB:SeedKB                               897ch
+postgres           ONB:KB:Insert                            INSERT INTO knowledge_base (business_id, title, content_encrypted, kb_type, is_active, ekp_sourced, 
+respondToWebhook   ONB:Respond                              
+postgres           USAGE:Lookup                             SELECT b.business_id, b.tier_name, b.contact_email, tl.monthly_task_limit, tl.notify_at_pct, tl.warn
+code               USAGE:Check                              1283ch
+code               USAGE:Apply                              349ch
+postgres           USAGE:Increment                          INSERT INTO tenant_usage (business_id, usage_month, tasks_used, t5_only_active) VALUES ($1, date_tru
+code               USAGE:Notify:Build                       2366ch
+postgres           USAGE:Notify:Enqueue                     INSERT INTO email_queue (to_address, subject, body_html, body_text, email_type, priority, status, sc
+scheduleTrigger    SCH:ApprovalEscalate                     {"interval": [{"field": "cronExpression", "expression": "*/2 * * * *"}]}
+postgres           APV:GetPending                           SELECT ap.*, b.approval_primary_phone, b.approval_primary_email, b.approval_primary_method, b.approv
+code               APV:Route                                2584ch
+postgres           APV:LogAttempt                           INSERT INTO approval_attempts (approval_id, business_id, attempt_method, recipient_target, sent_at) 
+code               APV:Capture                              1308ch
+postgres           APV:Capture:Save                         UPDATE approval_pending SET approved_at=NOW(), approved_by=$1, approved_by_role=$2, decision=$3 WHER
+code               APV:NotifyPrimary                        956ch
+postgres           APV:NotifyPrimary:Enqueue                INSERT INTO email_queue (to_address, subject, body_html, body_text, email_type, priority, status, sc
+webhook            FB:Webhook                               POST /sync/feedback
+code               FB:Capture                               1014ch
+postgres           FB:Persist                               INSERT INTO response_feedback (business_id, enquiry_id, approval_id, feedback_type, rejection_reason
+postgres           FB:Enqueue:RAGAdjust                     INSERT INTO background_tasks (business_id, task_type, payload, scheduled_for) VALUES ($1, 'rag_weigh
+code               FB:RAGAdjust                             1402ch
+postgres           FB:RAGAdjust:Apply                       INSERT INTO rag_weight_adjustments (business_id, kb_entry_id, weight_delta, reason, source_feedback_
+respondToWebhook   FB:Respond                               
+webhook            STATS:Webhook                            GET /sync/stats
+postgres           STATS:Query                              SELECT * FROM tenant_stats_30d WHERE business_id=$1;
+code               STATS:Build                              1844ch
+respondToWebhook   STATS:Respond                            
+code               TRACE:Init                               413ch
+code               TRACE:Mark                               450ch
+code               TRACE:Finalize                           1144ch
+postgres           TRACE:WriteTimings                       UPDATE enquiries SET correlation_id=$1, timing_intake_ms=$2, timing_guardian_ms=$3, timing_identity_
+code               LOG:Emit                                 521ch
+postgres           LOG:Persist                              INSERT INTO pipeline_log (correlation_id, business_id, stage, event, detail, duration_ms) VALUES ($1
+scheduleTrigger    SCH:HealthScoring                        {"interval": [{"field": "cronExpression", "expression": "0 6 * * *"}]}
+postgres           HEALTH:Gather                            WITH curr AS (SELECT business_id, COUNT(*) AS curr_count FROM enquiries WHERE created_at > NOW() - I
+code               HEALTH:Score                             2239ch
+postgres           HEALTH:Persist                           INSERT INTO tenant_health (business_id, health_score, enquiry_volume_trend, approval_response_time_t
+code               HEALTH:Outreach                          2044ch
+postgres           HEALTH:Outreach:Enqueue                  INSERT INTO email_queue (to_address, subject, body_html, body_text, email_type, priority, status, sc
+scheduleTrigger    SCH:CompassInternal                      {"interval": [{"field": "cronExpression", "expression": "0 */6 * * *"}]}
+postgres           CI:SelectSource                          SELECT * FROM compass_internal_sources WHERE enabled=true AND (last_scraped_at IS NULL OR last_scrap
+code               CI:Validate                              245ch
+httpRequest        CI:Fetch                                 {"method": "GET", "url": "={{$json.source_url}}", "options": {"timeout": 30000, "response": {"response": {"responseFormat": "text"}}}, "sendHeaders": true, "headerParameters": {"parameters": [{"name":
+code               CI:Parse                                 2472ch
+code               CI:ScorePrep                             1300ch
+httpRequest        CI:Ollama                                {"method": "GET", "url": "=http://{{$vars.SYNC_VPS2_HOST}}:11434/api/generate", "options": {"timeout": 30000, "response": {"response": {"responseFormat": "text"}}}, "sendHeaders": true, "headerParamet
+code               CI:Persist                               1073ch
+postgres           CI:Insert                                INSERT INTO compass_internal_signals (source_id, source_category, signal_title, signal_url, signal_s
+scheduleTrigger    SCH:CompassBrief                         {"interval": [{"field": "cronExpression", "expression": "0 7 * * 1"}]}
+postgres           CI:Brief:Fetch                           SELECT * FROM compass_internal_signals WHERE ingested_at > NOW() - INTERVAL '7 days' AND materiality
+code               CI:Brief:Build                           2635ch
+postgres           CI:Brief:Save                            INSERT INTO compass_internal_briefs (brief_period_start, brief_period_end, brief_title, brief_summar
+postgres           CI:Brief:Email                           INSERT INTO email_queue (to_address, subject, body_html, body_text, email_type, priority, status, sc
+scheduleTrigger    SCH:ComplianceScrape                     {"interval": [{"field": "cronExpression", "expression": "0 8 * * *"}]}
+postgres           COMP:Sources                             SELECT * FROM compass_internal_sources WHERE source_category='regulatory' AND enabled=true ORDER BY 
+httpRequest        COMP:Fetch                               {"method": "GET", "url": "={{$json.source_url}}", "options": {"timeout": 30000, "response": {"response": {"responseFormat": "text"}}}, "sendHeaders": true, "headerParameters": {"parameters": [{"name":
+code               COMP:Parse                               2472ch
+code               COMP:ClassifyPrep                        1168ch
+httpRequest        COMP:ClassifyOllama                      {"method": "GET", "url": "=http://{{$vars.SYNC_VPS2_HOST}}:11434/api/generate", "options": {"timeout": 30000, "response": {"response": {"responseFormat": "text"}}}, "sendHeaders": true, "headerParamet
+postgres           COMP:SignalInsert                        INSERT INTO compliance_signals (signal_source, signal_url, signal_title, signal_summary, signal_clas
+postgres           COMP:Gap:LoadDocs                        SELECT doc_id, doc_type, doc_version, doc_content FROM compliance_documents WHERE current=true;
+code               COMP:Gap:Build                           1487ch
+httpRequest        COMP:Gap:Ollama                          {"method": "GET", "url": "=http://{{$vars.SYNC_VPS2_HOST}}:11434/api/generate", "options": {"timeout": 30000, "response": {"response": {"responseFormat": "text"}}}, "sendHeaders": true, "headerParamet
+code               COMP:Gap:Persist                         897ch
+postgres           COMP:Gap:Insert                          INSERT INTO compliance_gaps (signal_id, affected_doc_type, gap_summary, recommended_action, draft_am
+postgres           API:EnquiriesWH:Auth                     SELECT ak.business_id, b.tier, b.status, b.operating_mode FROM api_keys ak JOIN businesses b ON ak.b
+if                 API:EnquiriesWH:Gate                     
+respondToWebhook   API:EnquiriesWH:Reject                   
+postgres           API:ApprovalsWH:Auth                     SELECT ak.business_id, b.tier, b.status, b.operating_mode FROM api_keys ak JOIN businesses b ON ak.b
+if                 API:ApprovalsWH:Gate                     
+respondToWebhook   API:ApprovalsWH:Reject                   
+postgres           API:KBGetWH:Auth                         SELECT ak.business_id, b.tier, b.status, b.operating_mode FROM api_keys ak JOIN businesses b ON ak.b
+if                 API:KBGetWH:Gate                         
+respondToWebhook   API:KBGetWH:Reject                       
+postgres           API:ProfileWH:Auth                       SELECT ak.business_id, b.tier, b.status, b.operating_mode FROM api_keys ak JOIN businesses b ON ak.b
+if                 API:ProfileWH:Gate                       
+respondToWebhook   API:ProfileWH:Reject                     
+postgres           API:SettingsWH:Auth                      SELECT ak.business_id, b.tier, b.status, b.operating_mode FROM api_keys ak JOIN businesses b ON ak.b
+if                 API:SettingsWH:Gate                      
+respondToWebhook   API:SettingsWH:Reject                    
+postgres           API:ConnStatusWH:Auth                    SELECT ak.business_id, b.tier, b.status, b.operating_mode FROM api_keys ak JOIN businesses b ON ak.b
+if                 API:ConnStatusWH:Gate                    
+respondToWebhook   API:ConnStatusWH:Reject                  
+postgres           STATS:Webhook:Auth                       SELECT ak.business_id, b.tier, b.status, b.operating_mode FROM api_keys ak JOIN businesses b ON ak.b
+if                 STATS:Webhook:Gate                       
+respondToWebhook   STATS:Webhook:Reject                     
+code               STR:VerifySig                            1028ch
+if                 STR:VerifyGate                           
+respondToWebhook   STR:VerifyReject                         
+postgres           GDPR:ErasureWebhook:Auth                 SELECT ak.business_id, b.tier, b.status, b.operating_mode FROM api_keys ak JOIN businesses b ON ak.b
+if                 GDPR:ErasureWebhook:Gate                 
+respondToWebhook   GDPR:ErasureWebhook:Reject               
+postgres           GDPR:ExportWebhook:Auth                  SELECT ak.business_id, b.tier, b.status, b.operating_mode FROM api_keys ak JOIN businesses b ON ak.b
+if                 GDPR:ExportWebhook:Gate                  
+respondToWebhook   GDPR:ExportWebhook:Reject                
+if                 OUT:DispatchRouter                       
+switch             OUT:ChannelSwitch                        
+emailSend          OUT:SendEmail                            {"fromEmail": "={{ $json.from_email || $vars.SYNC_FROM_EMAIL }}", "toEmail": "={{ $json.recipient_email || $json.sender_email }}", "subject": "={{ 'Re: ' + ($json.subject || 'Your enquiry') }}", "mess
+twilio             OUT:SendSMS                              {"operation": "create", "from": "={{ $vars.SYNC_TWILIO_FROM }}", "to": "={{ $json.recipient_mobile || $json.from_phone }}", "message": "={{ ($json.final_output || '').substring(0,160) }}", "options": 
+postgres           OUT:WidgetStore                          UPDATE enquiries SET response_text=$1, response_sent_at=NOW(), status='complete' WHERE enquiry_id=$2
+postgres           OUT:LogDelivery                          INSERT INTO delivery_log (enquiry_id, business_id, channel, delivery_status, delivered_at) VALUES ($
+postgres           SEC:PIIKey:Resolve                       SELECT key_version, encrypted_dek FROM tenant_pii_keys WHERE business_id=$1 AND is_active=true ORDER
+webhook            DASH:LoginWH                             POST /sync/dashboard/login
+postgres           DASH:Login                               WITH k AS (SELECT ak.business_id FROM api_keys ak   JOIN businesses b ON ak.business_id=b.business_i
+if                 DASH:LoginGate                           
+respondToWebhook   DASH:LoginRespond                        
+respondToWebhook   DASH:LoginReject                         
+switch             STR:LifecycleRouter                      
+postgres           STR:PaymentFailed                        UPDATE businesses SET status='payment_failed', updated_at=NOW() WHERE stripe_customer_id=$1 RETURNIN
+emailSend          STR:DunningEmail                         {"fromEmail": "={{ $vars.SYNC_FROM_EMAIL }}", "toEmail": "={{ $json.owner_email }}", "subject": "Action required \u2014 Sevari payment issue", "message": "Your Sevari subscription payment failed. Plea
+postgres           STR:SubscriptionUpdated                  UPDATE businesses SET tier=COALESCE(($1::jsonb)->>'tier_metadata', tier),   status=CASE WHEN ($1::js
+postgres           STR:Dispute                              INSERT INTO chargebacks (business_id, stripe_dispute_id, amount_pence, reason, status, created_at) S
+webhook            IN:EmailMailgun                          POST /sync/email/inbound
+code               IN:EmailVerify                           640ch
+postgres           IN:EmailLookupBiz                        SELECT b.business_id, b.tier FROM businesses b JOIN business_email_addresses bea ON b.business_id=be
+respondToWebhook   IN:EmailAck                              
+postgres           IDENT:ResolveContact                     WITH match AS (SELECT contact_id FROM contact_identities   WHERE business_id=$1 AND ((email_hash=enc
+scheduleTrigger    SCH:ConcReaper                           {"interval": [{"field": "cronExpression", "expression": "*/5 * * * *"}]}
+postgres           CONC:ReaperRun                           UPDATE tenant_concurrency SET   current_concurrent=GREATEST(0, current_concurrent-1),   last_reaped_
+scheduleTrigger    ALERT:Trigger                            {"interval": [{"field": "cronExpression", "expression": "*/5 * * * *"}]}
+postgres           ALERT:CheckCritical                      SELECT event_type, severity, source_node, business_id, detail, timestamp FROM system_events WHERE se
+httpRequest        ALERT:Slack                              {"method": "POST", "url": "={{ $vars.ALERT_SLACK_WEBHOOK }}", "sendBody": true, "specifyBody": "json", "jsonBody": "={{ JSON.stringify({text: '\ud83d\udea8 Sevari ' + $json.severity + ': ' + $json.eve
+postgres           ALERT:MarkSent                           UPDATE system_events SET alert_sent=true WHERE event_type=$1 AND timestamp=$2
+webhook            API:ConnSetupWH                          POST /sync/connector-setup
+postgres           API:ConnSetupWH:Auth                     SELECT ak.business_id, b.tier, b.status, b.operating_mode FROM api_keys ak JOIN businesses b ON ak.b
+if                 API:ConnSetupWH:Gate                     
+respondToWebhook   API:ConnSetupWH:Reject                   
+code               API:ConnSetup:Encrypt                    437ch
+postgres           API:ConnSetup:Write                      INSERT INTO external_integrations (integration_id, business_id, integration_type, provider_name,   c
+respondToWebhook   API:ConnSetup:Respond                    
+postgres           OP:DemoRateLimit                         INSERT INTO demo_rate_limit (ip_hash, request_count, window_start) VALUES (encode(sha256($1::bytea),
+if                 OP:DemoLimitGate                         
+respondToWebhook   OP:DemoLimitReject                       
+webhook            ADMIN:HIVEReviewWH                       POST /sync/admin/hive-review
+code               ADMIN:HIVEReview:Auth                    236ch
+if                 ADMIN:HIVEReview:Gate                    
+postgres           ADMIN:HIVEReview:Apply                   UPDATE hive_recommendations SET status=$1, reviewed_at=NOW(), reviewed_by='owner' WHERE recommendati
+respondToWebhook   ADMIN:HIVEReview:Respond                 
+respondToWebhook   ADMIN:HIVEReview:Reject                  
+respondToWebhook   IN:TenantLimit:Reject                    
+if                 DLV:OnApprove                            
+postgres           DLV:LoadDispatch                         SELECT e.enquiry_id, e.business_id, e.channel, e.subject, e.response_text AS final_output, e.sender_
+code               DLV:DecryptRecipient                     828ch
+postgres           DLV:RejectClose                          UPDATE enquiries SET status='closed_rejected', completed_at=NOW() WHERE enquiry_id=$1 RETURNING enqu
+respondToWebhook   DLV:Respond                              
+respondToWebhook   DLV:RejectRespond                        
+postgres           HERALD:PG:Fetch                          SELECT b.business_id,b.industry,b.tier_name, COALESCE((SELECT content_type FROM system_events WHERE 
+code               HERALD:BuildPrompt                       1382ch
+code               HERALD:Ollama                            2018ch
+postgres           HERALD:PG:Save                           INSERT INTO system_events(business_id,event_type,payload,created_at) VALUES($1,'herald_content_gener
+postgres           HERALD:Approve:Enqueue                   INSERT INTO approval_queue(business_id,approval_type,payload,status,created_at,expires_at) VALUES($1
+code               WGT:SessionBridge                        210ch
+scheduleTrigger    SCH:RAGAdjustWorker                      {"interval": [{"field": "minutes", "minutesInterval": 15}]}
+postgres           RAGAdjust:Fetch                          SELECT rwa_id,business_id,chunk_id,weight_delta FROM rag_weight_adjustments WHERE applied=false ORDE
+scheduleTrigger    SCH:BriefPM                              {"interval": [{"field": "cronExpression", "expression": "0 17 * * 1-5"}]}
+if                 ADMIN:FullGate                           
+code               SVR:SENTINEL:Call                        3207ch

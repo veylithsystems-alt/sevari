@@ -1,0 +1,8 @@
+{
+  "name": "eslint-plugin-sevari",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.js",
+  "description": "Contract §4 lint rules. These fail CI."
+}

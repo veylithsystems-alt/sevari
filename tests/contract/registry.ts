@@ -1,0 +1,98 @@
+/**
+ * Every test the build contract names, with the phase that must turn it green.
+ * Source of truth for `pnpm contract:status` and the CI gate (scripts/run-gate.mjs).
+ * Adding a test here is free; removing one is a contract amendment (§14).
+ */
+export type Phase =
+  | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '9b' | '10' | '11' | '12' | '13' | '14' | '15'
+  | '18' | '20' | '21' | '22' | '23' | '24' | '25';
+
+export interface ContractTest {
+  readonly id: string;
+  readonly phase: Phase;
+  readonly section: string;
+  readonly title: string;
+}
+
+const t = (id: string, phase: Phase, section: string, title: string): ContractTest => ({ id, phase, section, title });
+
+export const CONTRACT_TESTS: readonly ContractTest[] = [
+  // Part A
+  t('F1', '1', '§10.1', 'No cross-tenant read or write, as the app DB role, via SQL and API'),
+  t('F2', '2', '§10.1 §60.1', 'Egress: static scan against allowlist + runtime proxy deny'),
+  t('F3', '4', '§10.1', 'Grounding: injected unsupported facts are always blocked (property-based)'),
+  t('F4', '1', '§10.1', 'Region: null region refused; cross-region write without contract refused'),
+  t('F5', '7', '§10.1', 'Erasure registry coverage + E2E erase leaves no recoverable PII'),
+  t('F6', '6', '§10.1', 'Approvals: single-use, expiry in query, digest mismatch, concurrent consume'),
+  t('F7', '4', '§10.1', 'ACK latency p50/p95/p99 under 20 concurrent enquiries while model busy'),
+  t('F8', '6', '§10.1', 'No consequential action without approval or grant, in either mode'),
+  t('T-BOOT', '1', '§3 INV-9', 'App refuses to start if any boot check fails'),
+  t('T-AUD', '1', '§3 INV-8', 'Audit log append-only and hash-chained; app role cannot UPDATE/DELETE'),
+  t('T-SEC', '0', '§3 INV-10', 'No production secret in the repo (gitleaks config + scan)'),
+  t('T-RES', '6', '§3 INV-11 §8.3', 'Reserved decisions cannot be unlocked by any config value'),
+  t('T-MIG', '1', '§10.1', 'Migrations apply up and down cleanly'),
+  t('T-IDEM', '2', '§10.1', 'Replaying every webhook twice gives one effect'),
+  t('T-CHAOS', '6', '§10.1', 'Killing the worker mid-step resumes with no double send'),
+  t('T-LINT', '0', '§4', 'Contract lint rules reject forbidden code'),
+  // Part B
+  t('F9', '10', '§17.2', 'Suppression race: opt-out always wins over concurrent send'),
+  t('F10', '10', '§17.2', 'A contact without provenance cannot be messaged'),
+  t('F11', '10', '§17.2 §43', 'Sole traders / unknown subscribers are treated as individuals'),
+  t('F12', '10', '§17.2', 'TPS/preference-register check gate exists and blocks'),
+  t('F13', '10', '§17.2', 'Frequency caps and quiet hours enforced'),
+  t('T-ONB-1', '11', '§18', 'No activation without checklist plus human approval'),
+  t('T-ONB-2', '11', '§18', 'An import without a lawful basis is blocked'),
+  t('T-ONB-3', '11', '§18', 'A tenant cannot leave shadow mode automatically'),
+  t('F14', '12', '§19.1', 'No payout/transfer/balance op unless money_mode is platform_signed_off'),
+  t('F15', '12', '§19.2', 'Ledger always balances to zero'),
+  t('F16', '12', '§19.3', 'Replaying the same webhook or bank line twice gives one effect'),
+  t('F17', '12', '§19.3', 'Matching never auto-applies below the confidence threshold'),
+  t('F18', '12', '§19.3', 'Reconciliation totals equal processor totals on fixtures'),
+  t('T-CMP-1', '14', '§20', 'A legal threat produces no model reply and an escalation'),
+  t('T-CMP-2', '14', '§20', 'A remedy outside the resolution policy is blocked'),
+  t('T-CMP-3', '14', '§20', 'Complaint clock and breach alerts'),
+  t('T-CMP-4', '14', '§20', 'A vulnerable-customer flag disables auto-send'),
+  t('F19', '15', '§21.3', 'Offload to an unregistered recipient is blocked'),
+  t('F20', '15', '§21.3', 'An exported bundle contains only registry-declared fields'),
+  t('F21', '15', '§21.3', 'Erasure E2E including processor tokens, search index and caches'),
+  t('T-OFF-1', '15', '§21.3', 'No case is ever left without an owner'),
+  // Part C
+  t('F22', '18', '§30.7', 'A human response with no consumer is rejected'),
+  t('F23', '18', '§30.7', 'An applied input always has a receipt; a missing receipt alerts'),
+  t('F24', '18', '§30.7', 'Timeout, ambiguity, wrong role, stale digest -> declared safe state, never approval'),
+  t('F25', '18', '§30.7', 'An owner edit generates a clarification, not a silent knowledge update'),
+  t('F26', '18', '§30.7', 'A reserved decision cannot be answered by an unauthorised role'),
+  t('F27', '18', '§30.7', 'Rubber-stamp detection'),
+  t('F28', '22', '§31.4', 'Canary string from one tenant never appears in another tenant artefact or prompt'),
+  t('F29', '23', '§33', 'Erased data leaves no training example and the adapter is flagged tainted'),
+  t('F30', '23', '§33', 'A canary leak blocks adapter promotion'),
+  t('F31', '21', '§35', 'A candidate that worsens any floor is never promoted'),
+  t('F32', '21', '§35 INV-18', 'Automatic changes only move toward caution'),
+  t('F33', '21', '§35 INV-17', 'A learned artefact cannot touch a frozen item'),
+  t('F34', '21', '§35', 'Promotion without a human gate fails'),
+  t('T-DRIFT', '20', '§32', 'Drift monitors trigger alert/freeze/rollback at thresholds'),
+  t('T-ROLL', '20', '§32', 'Automatic rollback to last good artefact'),
+  t('T-KILL', '20', '§32', 'Kill switch per tenant/scope/cell/global reverts to baseline'),
+  t('T-REPLAY', '20', '§32', 'A production reply can be re-run exactly from lineage'),
+  t('F35', '25', '§36.2', 'Erasure is re-applied after a backup restore'),
+  t('F36', '25', '§36.3', '≥200 prompt-injection attempts: no ungrounded fact, policy change, leak or send'),
+  // Part F
+  t('F37', '9b', '§50.7', 'Missed-call text sent only when every §50.2 condition holds'),
+  t('F38', '9b', '§50.7 §60.2', 'Template lint: no marketing/price/offer/unsourced value; GSM-7; segment cap'),
+  t('F39', '9b', '§50.7', 'STOP race: opt-out always wins; never texted again'),
+  t('F40', '9b', '§50.7', 'No audio: audio/recording payloads rejected; no audio field in schema'),
+  t('F41', '9b', '§50.7', 'Rate caps and abuse screen; flood never yields unbounded sends'),
+  t('F42', '9b', '§50.7', 'Replaying the same call webhook twice gives one text'),
+  t('F43', '9b', '§50.7', 'Tenant isolation for call events and numbers'),
+  t('F44', '9b', '§50.7', 'Erasure removes caller number, call events, blind index; certificate lists provider tail'),
+  t('F45', '9b', '§50.7', 'Call-end to text accepted within target under 20 concurrent calls'),
+];
+
+/** T1–T23 come from the v3.6 resurrection review, which has not been supplied yet (see docs/reference/t-mapping.md). */
+export const RESURRECTION_TESTS_PENDING = Array.from({ length: 23 }, (_, i) => `T${i + 1}`);
+
+export function byId(id: string): ContractTest {
+  const found = CONTRACT_TESTS.find((x) => x.id === id);
+  if (!found) throw new Error(`Unknown contract test id: ${id}`);
+  return found;
+}
