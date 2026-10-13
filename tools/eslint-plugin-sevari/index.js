@@ -91,14 +91,21 @@ const noRawDate = {
 };
 
 /** §4: No raw string SQL that touches tenant tables outside packages/db. */
-const SQL_RE = /\b(select\s[\s\S]*?\sfrom|insert\s+into|update\s+\w+\s+set|delete\s+from|alter\s+table|create\s+table|truncate)\b/i;
+// Upper-case SELECT ... FROM, any-case DML/DDL shapes, or lower-case select...from with SQL-only tokens.
+// Plain English ("please select a time from the list") does not match.
+const SQL_RES = [
+  /\bSELECT\b[\s\S]*\bFROM\b/,
+  /\b(insert\s+into|delete\s+from|alter\s+table|create\s+table|drop\s+table|truncate\s+table)\b/i,
+  /\bupdate\s+[a-z_][\w.]*\s+set\s+[a-z_]\w*\s*=/i,
+  /\bselect\b[\s\S]*\bfrom\b[\s\S]*(\bwhere\b|\bjoin\b|\$\d|;|\border\s+by\b)/i,
+];
 const noRawSqlOutsideDb = {
   meta: { type: 'problem', docs: { description: 'SQL only inside packages/db (contract §4)' }, schema: [] },
   create(context) {
     const f = context.filename;
     if (inPkg(f, 'db') || isTestFile(f) || /\/scripts\//.test(norm(f))) return {};
     const check = (node, text) => {
-      if (typeof text === 'string' && SQL_RE.test(text)) {
+      if (typeof text === 'string' && SQL_RES.some((re) => re.test(text))) {
         context.report({ node, message: 'Raw SQL outside packages/db is forbidden (contract §4). Add a repository function to @sevari/db.' });
       }
     };

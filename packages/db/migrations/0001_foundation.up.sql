@@ -45,6 +45,8 @@ CREATE TRIGGER regions_touch BEFORE UPDATE ON regions FOR EACH ROW EXECUTE FUNCT
 ALTER TABLE regions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE regions FORCE ROW LEVEL SECURITY;
 CREATE POLICY regions_read ON regions FOR SELECT TO sevari_app USING (true);
+-- Regions are administered by humans through the owner role (provisioning), never by the app.
+CREATE POLICY regions_admin ON regions FOR ALL TO sevari_owner USING (true) WITH CHECK (true);
 GRANT SELECT ON regions TO sevari_app;
 
 ------------------------------------------------------------------------------------------------
@@ -124,6 +126,9 @@ END $$;
 SELECT sevari_meta.apply_tenant_rls('tenants', 'SELECT, INSERT, UPDATE');
 -- The transfer contracts are readable (the policy function needs them) but never writable by the app.
 SELECT sevari_meta.apply_tenant_rls('region_transfer_contracts', 'SELECT');
+-- Recorded by a human (Dan/counsel) through the owner role. The owner role has no policy on any other
+-- tenant table, so even the migration role cannot read tenant data.
+CREATE POLICY rtc_admin ON region_transfer_contracts FOR ALL TO sevari_owner USING (true) WITH CHECK (true);
 
 ------------------------------------------------------------------------------------------------
 -- Envelope encryption key store (§6.3). Wrapped DEKs only; KEKs never touch the database.

@@ -12,6 +12,8 @@ export interface TestDatabaseInfo {
   /** Application role: NOBYPASSRLS, not the owner. Every isolation test runs as this. */
   readonly appUrl?: string;
   readonly database?: string;
+  /** Superuser connection to the server's maintenance database, for creating isolated databases. */
+  readonly serverUrl?: string;
 }
 
 export interface TestDatabase {
@@ -30,7 +32,7 @@ function withDb(url: string, database: string, user?: string, password?: string)
   return u.toString();
 }
 
-async function prepare(adminUrl: string): Promise<TestDatabaseInfo> {
+export async function prepare(adminUrl: string): Promise<TestDatabaseInfo> {
   const database = `sevari_test_${randomBytes(4).toString('hex')}`;
   const admin = new pg.Client({ connectionString: adminUrl });
   await admin.connect();
@@ -44,7 +46,7 @@ async function prepare(adminUrl: string): Promise<TestDatabaseInfo> {
   const ownerUrl = withDb(adminUrl, database, 'sevari_owner', TEST_PASSWORDS.owner);
   const appUrl = withDb(adminUrl, database, 'sevari_app', TEST_PASSWORDS.app);
   await runMigrations({ ownerUrl });
-  return { available: true, superUrl, ownerUrl, appUrl, database };
+  return { available: true, superUrl, ownerUrl, appUrl, database, serverUrl: adminUrl };
 }
 
 export async function startTestDatabase(): Promise<TestDatabase> {
@@ -53,15 +55,7 @@ export async function startTestDatabase(): Promise<TestDatabase> {
     const info = await prepare(external);
     return {
       info,
-      async stop() {
-        const admin = new pg.Client({ connectionString: external });
-        await admin.connect();
-        try {
-          await admin.query(`DROP DATABASE IF EXISTS ${info.database} WITH (FORCE)`);
-        } finally {
-          await admin.end();
-        }
-      },
+      stop: () => dropDatabase(external, info.database!),
     };
   }
   try {
@@ -72,5 +66,15 @@ export async function startTestDatabase(): Promise<TestDatabase> {
   } catch (err) {
     const reason = `No test database: set SEVARI_TEST_DATABASE_URL or run Docker for Testcontainers (${(err as Error).message})`;
     return { info: { available: false, reason }, stop: async () => undefined };
+  }
+}
+
+export async function dropDatabase(serverUrl: string, database: string): Promise<void> {
+  const admin = new pg.Client({ connectionString: serverUrl });
+  await admin.connect();
+  try {
+    await admin.query(`DROP DATABASE IF EXISTS ${database} WITH (FORCE)`);
+  } finally {
+    await admin.end();
   }
 }

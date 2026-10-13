@@ -1,5 +1,5 @@
 import type { TestProject } from 'vitest/node';
-import { startTestDatabase, type TestDatabase } from './database.ts';
+import { startTestDatabase, type TestDatabase, type TestDatabaseInfo } from './database.ts';
 
 let db: TestDatabase | undefined;
 
@@ -13,6 +13,6 @@ export default async function setup(project: TestProject): Promise<() => Promise
 
 declare module 'vitest' {
   export interface ProvidedContext {
-    database: import('./database.ts').TestDatabaseInfo;
+    database: TestDatabaseInfo;
   }
 }

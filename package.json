@@ -2,11 +2,13 @@
   "name": "sevari-core",
   "private": true,
   "version": "0.1.0",
-  "description": "Sevari BDI — the operations layer for service businesses. Build contract: docs/BUILD_CONTRACT.md",
+  "description": "Sevari BDI \u2014 the operations layer for service businesses. Build contract: docs/BUILD_CONTRACT.md",
   "license": "UNLICENSED",
   "type": "module",
   "packageManager": "pnpm@10.28.0",
-  "engines": { "node": ">=22 <23" },
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
@@ -23,16 +25,32 @@
   },
   "devDependencies": {
     "@eslint/js": "9.39.1",
+    "@sevari/audit": "workspace:*",
+    "@sevari/boot": "workspace:*",
+    "@sevari/clock": "workspace:*",
+    "@sevari/crypto": "workspace:*",
+    "@sevari/db": "workspace:*",
+    "@sevari/domain": "workspace:*",
+    "@sevari/egress": "workspace:*",
+    "@sevari/privacy": "workspace:*",
+    "@sevari/region": "workspace:*",
+    "@testcontainers/postgresql": "11.7.2",
     "@types/node": "22.20.5",
     "@types/pg": "8.15.6",
     "@vitest/coverage-v8": "3.2.7",
     "eslint": "9.39.5",
     "fast-check": "4.3.0",
+    "pg": "8.16.3",
     "testcontainers": "11.7.2",
-    "@testcontainers/postgresql": "11.7.2",
     "tsx": "4.20.6",
     "typescript": "5.9.3",
     "typescript-eslint": "8.46.4",
-    "vitest": "3.2.7"
+    "vitest": "3.2.7",
+    "yaml": "2.8.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }
