@@ -4,6 +4,8 @@ Reviewer: Claude Code, 13 October 2026, against `docs/BUILD_CONTRACT.md` v1.9, t
 
 **Only Dan amends the contract (§14).** Nothing here is in force. Each item is a proposal with the reason, what changes, and whether it's constitutional (touches §3 or §8.3). Items marked **[built]** are already implemented on the branch because they're stricter than the contract and loosen nothing (Part C lets later work tighten §3 but never loosen it). Dan can still reject them.
 
+> **Update 13 Oct 2026:** Dan's own amendments are now in the contract as **Part J (v1.10)**: three finished states (build-complete, production-approved, commercially launched), a Production Readiness phase, a Value Gate, the billing split and capability matrix, delivery-ambiguity tests F46–F50, an honest key-management threat model (T-KEY-1..4), the adversarial holdout corpus (F3H), a structured processor registry, approved SLO/RTO/RPO, and precise legal controls. Where my proposals overlap, Part J wins: R-11 is covered by §66/§68, R-16 by §70. The rest below are still proposals.
+
 Legend: **R** = recommendation, **Q** = needs Dan's decision (see `docs/QUESTIONS_FOR_DAN.md`), **C** = constitutional.
 
 ---

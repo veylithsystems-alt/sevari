@@ -1,6 +1,6 @@
 # sevari-core — Build Contract for Claude Code
 
-Version 1.9 · 12 October 2026 (Part I: Twilio ADR draft answers; Part H: build checklist and Twilio ADR requirements; Part G: capacity and cost-floor model; missed-call text adapter confirmed, Part F; D1 and D3 confirmed; Part D: market, beachhead, trades; Part E: pilot market, pricing and outreach; Appendices 1–2: go-to-market and pilot plans) (Part B: full lifecycle §16–§27; Part C: decisions, human feedback, governed self-learning, platform hardening §28–§40) · Owner: Dan Hadfield (Veylith Systems)
+Version 1.10 · 13 October 2026 (Part J: definition of finished, production readiness, value gate, delivery ambiguity, key management, grounding holdout, processor registry, recovery, legal precision; Part I: Twilio ADR draft answers; Part H: build checklist and Twilio ADR requirements; Part G: capacity and cost-floor model; missed-call text adapter confirmed, Part F; D1 and D3 confirmed; Part D: market, beachhead, trades; Part E: pilot market, pricing and outreach; Appendices 1–2: go-to-market and pilot plans) (Part B: full lifecycle §16–§27; Part C: decisions, human feedback, governed self-learning, platform hardening §28–§40) · Owner: Dan Hadfield (Veylith Systems)
 Status: binding on every pull request. If the code and this contract disagree, the code is wrong or the contract needs to be amended (§14). Nothing in between counts.
 
 ---
@@ -1170,6 +1170,133 @@ These override §36.3, §50 and §53 where they conflict.
 5. Message Redaction and Static Proxy: whether to pay for them if they're edition features.
 6. Account actions: accept the Twilio data processing addendum, subscribe to sub-processor notices, set spend alerts.
 7. All items still open in §40, §44, §48, §55 and §58.
+
+---
+---
+
+# PART J — Definition of finished, value gate, delivery, keys, grounding, processors, recovery, legal precision (added in v1.10)
+
+Part J overrides Parts A–I wherever they conflict, except §3 and §8.3, which it only tightens or clarifies. Source: Dan's amendments of 13 October 2026. The architecture and the existing requirements stay as they are; Part J defines what "finished" means, removes ambiguity and closes reliability gaps.
+
+## 62. What "finished" means: three separate states
+
+| State | Meaning | Who declares it | Evidence |
+|---|---|---|---|
+| **Build-complete** | Phases 0–8 (and any later phase in scope) have their exit criteria green | Claude Code reports; Dan merges | CI gate, phase reports (§13) |
+| **Production-approved** | §63 Production Readiness has passed | **Dan (human, §8.3)** | `docs/readiness/` evidence pack, each item signed off |
+| **Commercially launched** | §64 Value Gate has passed | **Dan (human, §8.3)** | `docs/readiness/value-gate.md` with pilot evidence |
+
+Rules:
+- Until §63 passes, the system is described everywhere (README, trust page, sales material, reports) as **build-complete, not production-approved**. A passing CI pipeline MUST NOT be presented as evidence that the service is ready for paying customers.
+- The prohibition on production deployment (§12) stays until §63 passes. Pilots run under §63's pilot-scope subset only (marked P below).
+
+## 63. Production Readiness phase (new phase "PR")
+
+Each item needs evidence in `docs/readiness/` and a dated human sign-off recorded as a `human_inputs` approval (§30). Items marked **P** are also required before the first pilot.
+
+| # | Item | Evidence required | P |
+|---|---|---|---|
+| PR-1 | Deployment | Reproducible deployment from the repo to the target box; rollback to the previous release tested | P |
+| PR-2 | Recovery | Backup schedule running; a timed restore to a clean box meets the approved RPO/RTO (§70); erasure re-applied after restore (F35) | P |
+| PR-3 | Security review | Threat model current (§36.3); key-management boundary documented (§67); external penetration test before the first **paying** tenant | P (threat model, keys) |
+| PR-4 | Monitoring | SLO dashboards, alert routes to a person, on-call expectation written down | P |
+| PR-5 | Customer onboarding | Tenant onboarding (§18) run end to end on the house tenant and one test tenant | P |
+| PR-6 | Support | Support channel, response expectations and escalation path written and tested | P |
+| PR-7 | Billing arrangements | Subscription collection works for the plan in use; a manual process is acceptable for pilots (§65) | P (manual) |
+| PR-8 | Terms and privacy | Terms of service, DPA, privacy notice, sub-processor list and AI-disclosure wording approved (Counsel, Dan) | P |
+| PR-9 | Incident handling | Incident and personal-data-breach assessment workflow (§71) exercised in a drill | P |
+| PR-10 | Cancellation, export and erasure | Tenant exit (§21.1) run end to end in a test tenant: notice, export, erasure certificate | P |
+| PR-11 | Pilot acceptance | Pilot agreement and success criteria agreed with each pilot before start (§46) | P |
+
+## 64. Value Gate (before wider commercial launch)
+
+Before any commercial launch beyond the pilots, Dan approves this gate on evidence. Failing it means more pilots or a change of product, not a launch.
+
+| Gate | Evidence required |
+|---|---|
+| Product value | Pilot businesses show that Sevari improves response, qualification or booking outcomes, measured against their own baseline from before the pilot |
+| Owner workload | Total owner time spent correcting drafts, handling UNKNOWNs and maintaining business data is measured (time log §54, reply records §10.2), and is lower than the time Sevari saves |
+| Reliability | The acceptance corpus and pilot evidence meet the approved grounding, security and escalation criteria (§68) |
+| Unit economics | Cost per resolved enquiry and direct cost per customer are measured on the actual infrastructure (§54), with no H values left in the calculation |
+| Retention | Pilot customers continue to use the product and show willingness to pay (a signed paid plan or a deposit), not just praise for the concept |
+| Operational readiness | Support, incident handling, data recovery, cancellation, export and erasure have been tested (§63 complete) |
+
+The system produces the evidence (pilot report §46, metrics §10.3, cost views §54). The judgement is Dan's.
+
+## 65. Two kinds of billing, and a capability matrix
+
+"Billing" means two different things, and they have different timing:
+- **Tenant-side billing (Lifecycle T):** invoices, payment links and overdue chasing that Sevari performs *on behalf of* a business for its customers (§19.2).
+- **Veylith subscription billing (Lifecycle V):** how Veylith collects its own revenue from tenants (§19.4).
+
+Every capability is classified in `docs/CAPABILITY_MATRIX.md` as **Pilot** (needed for the first pilots), **Launch** (needed before §64 commercial launch) or **Deferred**. Subscription billing for pilots MAY be manual (invoice and bank transfer or a hosted payment link created by hand). It is not necessary to build a billing platform before demand is validated. §8.1's tenant-side invoicing items are Launch unless the matrix says otherwise. Voice stays out of v1 (§12).
+
+The first customer segment and the five supported trades (§15.7, §42) are decided **before** the evaluation corpus is finalised. The corpus can be drafted earlier, but it is not frozen as the golden set (§32) until Dan confirms them.
+
+## 66. External delivery: exactly-once is not assumed
+
+The outbox and unique constraint (§5.2) prevent duplicate *queue records*. They do not guarantee exactly-once delivery by an external email or SMS provider: a provider can accept a message and Sevari can crash before recording that.
+
+Requirements:
+- Every outbound send records an intent **before** the provider call and the outcome **after** it. A send whose outcome is unknown (crash or timeout after the call started) enters an `ambiguous` state. It is never blindly retried.
+- Where the provider supports idempotency keys, the send uses one derived from `(draft_id, channel_send)`. Where it supports lookup by our reference, an ambiguous send is **reconciled** (does the provider have it?) before any retry.
+- Where neither exists, the residual risk is documented per provider in its ADR, and the system applies duplicate detection (same recipient, same content digest within a window) and recovery (owner task) instead of a silent retry.
+- Consequential classes (`payment_request`, `cancel`, `booking_change`, `refund`, `invoice_send`) never retry an ambiguous send automatically. They raise an owner task.
+- Tests (red first, Phase 6): **F46** crash immediately before provider acceptance (exactly one send after recovery); **F47** crash immediately after provider acceptance, before the result is saved (no second send; reconciled or escalated); **F48** timeout with an ambiguous outcome (reconcile, then escalate; never a blind retry); **F49** duplicate provider webhooks and provider-side retries (one effect); **F50** consequential classes never auto-retry an ambiguous send.
+
+## 67. Key management: honest threat model
+
+Per-tenant keys (§6.3) limit blast radius between tenants and make crypto-shredding possible. They do **not** protect data against an attacker who compromises the host where both the encrypted data and the key-unwrapping capability are available.
+
+Requirements:
+- `docs/security/key-management.md` states the threat model: what each key protects against, what it doesn't, and the residual risk of the v1 single-VPS key file. The README and trust page MUST NOT describe a local key file as independent key security.
+- The key-management trust boundary is separate from ordinary application access: the KEK is readable only by a dedicated process or user (not the API process user), unwrap requests are authenticated and logged, and the plan for moving the KEK to a separate host, HSM or managed KMS is written down with its trigger.
+- Rotation (KEK and DEK), revocation and recovery are defined and tested: **T-KEY-1** KEK rotation re-wraps every DEK without data loss; **T-KEY-2** a revoked KEK can no longer unwrap; **T-KEY-3** restoring a backup restores encrypted data and wrapped keys without granting any tenant access to another tenant's keys, and without restoring keys that were crypto-shredded after the backup (shred register re-applied, linked to F35); **T-KEY-4** compromise drill: the documented response (rotate, re-wrap, revoke, notify assessment) runs end to end.
+- Backups are encrypted with a key that is not stored on the same host as the backup.
+
+## 68. Grounding that can't be gamed
+
+- Replace "never wrong on facts" (§1) as an engineering rule with: **no observed unsupported claims in the acceptance and release evaluation sets; every detected failure blocks the send or escalates; any observed failure in production triggers an investigation and suspends the affected autonomous action class (§7.2 kill switch) until resolved.** Marketing copy may use only claims that meet this (§43 claims register).
+- An **adversarial holdout corpus** (`eval/holdout/`) is kept separate from anything used to build or tune the implementation. It covers contradictory facts, expired prices, discounts, exclusions, negation, misleading combinations of individually valid facts, prompt injection, and ambiguous booking requests. It is run at release, its contents are not used for tuning, and it is refreshed by humans.
+- The model never certifies its own factual correctness. Grounding is deterministic validation; material claims (prices, dates, times, availability, commitments, remedies) are compared claim by claim against the authorised source record.
+- Tests are reviewed by a human as well as code: grounding and approval test changes need Dan's review in the PR.
+- Test: **F3H** the holdout corpus passes with zero unsupported claims sent; the holdout files are excluded from any tuning path (a test checks no other code reads them).
+
+## 69. Processor registry separate from the egress allowlist
+
+An allowed hostname is not a processor record.
+- `config/processors.yaml` is the structured processor registry: purpose, data categories, hosting region and data locations, sub-processors (with a source link), terms and DPA reference, retention, transfer mechanism, review status and review date, and the human approval record.
+- Each egress allowlist entry references a processor id. CI fails if an allowlisted host has no approved processor entry, or a processor has hosts that aren't allowlisted.
+- `docs/PROCESSOR_REGISTER.md`, the tenant-facing sub-processor list and the ROPA inputs are generated from the registry plus the allowlist. A new processor still needs human approval (§29).
+- The actual data destination of email and SMS services is tested where the provider allows it (for example, the region a message is stored in). A UK-hosted database does not by itself establish that all processing stays in the UK.
+
+## 70. Service levels, recovery and performance
+
+- Before live use, Dan approves in `config/slo.yaml`: availability target, RTO, RPO, backup frequency and restore acceptance criteria. Until approved, the values are null and the cell refuses live tenants (boot check, like §8.4).
+- The acknowledgement target is stated with its percentile and conditions: **ACK p95 ≤ the F7 target, measured under 20 concurrent enquiries with the model busy, and separately with the downstream messaging provider slow** (provider latency injected). The ACK is persisted and queued within the target even when the provider is slow; delivery time is reported separately.
+- Load tests at increasing concurrency report queue delay, error rate and the capacity limit of the target box (§36.1 capacity engine).
+- No document promises more availability or recoverability than the infrastructure provides. The trust page shows measured values only.
+
+## 71. Legal controls stay precise
+
+- **Sign-offs are auditable approval records.** Counsel and Dan sign-offs (§8.4 region packs, §17 tiers, money mode, learning register) are `human_inputs` approvals with the approver's identity, role, date, scope and expiry, written to the audit chain. A configuration field may mirror the approval, but the boot check verifies the approval record, not the field alone.
+- **Breach handling is assess-then-notify.** A detected incident starts an immediate assessment workflow with a running clock. Whether the regulator and data subjects must be told depends on the applicable threshold (for the UK: whether the breach is likely to result in a risk to people's rights and freedoms, and for data subjects, a high risk). Where reporting is required, it is made within 72 hours of becoming aware where feasible, with reasons for any delay. The system drafts; a human decides and releases (§36.4). This replaces any reading of §8.4 that every incident is reported within 72 hours.
+- **Article 22 classification per use case.** §8.3's reservation of decisions with legal or similarly significant effects stays in force as a precaution. Whether a given automated decision is in fact solely automated with such effects is confirmed per use case by counsel and recorded in the decision register. The reservation is never loosened by that classification without a constitutional amendment.
+
+## 72. Phase table additions
+
+| Phase | Scope | Exit |
+|---|---|---|
+| 6 (added) | Delivery ambiguity handling | F46–F50 green |
+| 4 (added) | Adversarial holdout corpus | F3H green |
+| 7 (added) | Key-management boundary, rotation, revocation, restore | T-KEY-1..4 green; `docs/security/key-management.md` |
+| 2 (changed) | Processor registry linked to the allowlist | Register generated from `config/processors.yaml` |
+| PR | Production Readiness (§63) | Every PR item evidenced and signed |
+| VG | Value Gate (§64) | Dan's approval on evidence |
+
+## 73. Changelog
+
+- **v1.10 (13 October 2026, Dan):** Part J added: build-complete vs production-approved vs commercially launched; Production Readiness phase; Value Gate; billing split and capability matrix; delivery-ambiguity tests F46–F50; key-management threat model and T-KEY tests; adversarial holdout corpus F3H and the testable replacement for "never wrong on facts"; structured processor registry; SLO/RTO/RPO approval; auditable sign-offs, assess-then-notify breach handling, Article 22 classification per use case. §3 and §8.3 are clarified and tightened, never loosened (constitutional note: §71 keeps the §8.3 Art. 22 reservation intact).
 
 ---
 ---

@@ -8,7 +8,9 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 
 ## For Dan: where things stand (plain English)
 
-**Last updated:** 13 October 2026 · **Branch:** `claude/sevari-core-build`
+**Last updated:** 13 October 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.10
+
+**Status: build in progress.** Under contract Part J there are three separate milestones: *build-complete* (code and tests done), *production-approved* (deployment, recovery, security, support, legal documents all proven: [`docs/readiness/`](docs/readiness/README.md)), and *commercially launched* (pilots prove the product is worth paying for: the Value Gate). Passing automated tests is **not** evidence that Sevari is ready for paying customers.
 
 | Phase | What it is | Status |
 |---|---|---|
@@ -103,6 +105,8 @@ Run `pnpm contract:status` for the live table. At the end of Phase 1: F1, F4, T-
 ### Documents
 - [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md): the binding contract (v1.9)
 - [`docs/CONTRACT_REVIEW.md`](docs/CONTRACT_REVIEW.md): proposed amendments
+- [`docs/readiness/README.md`](docs/readiness/README.md): Production Readiness and Value Gate tracker
+- [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md): what's needed for pilots, for launch, or deferred
 - [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md): every difference from the contract, with reasons
 - [`docs/QUESTIONS_FOR_DAN.md`](docs/QUESTIONS_FOR_DAN.md): open decisions
 - [`docs/reference/v4.1-behaviours.md`](docs/reference/v4.1-behaviours.md): behaviours and defects from the n8n builds

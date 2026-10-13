@@ -86,6 +86,20 @@ export const CONTRACT_TESTS: readonly ContractTest[] = [
   t('F43', '9b', '§50.7', 'Tenant isolation for call events and numbers'),
   t('F44', '9b', '§50.7', 'Erasure removes caller number, call events, blind index; certificate lists provider tail'),
   t('F45', '9b', '§50.7', 'Call-end to text accepted within target under 20 concurrent calls'),
+  // Part J (v1.10)
+  t('F3H', '4', '§68', 'Adversarial holdout corpus: zero unsupported claims sent; holdout never used for tuning'),
+  t('F46', '6', '§66', 'Crash immediately before provider acceptance: exactly one send after recovery'),
+  t('F47', '6', '§66', 'Crash after provider acceptance, before result saved: no second send; reconciled or escalated'),
+  t('F48', '6', '§66', 'Ambiguous timeout: reconcile, then escalate; never a blind retry'),
+  t('F49', '6', '§66', 'Duplicate provider webhooks and provider retries: one effect'),
+  t('F50', '6', '§66', 'Consequential classes never auto-retry an ambiguous send'),
+  t('T-KEY-1', '7', '§67', 'KEK rotation re-wraps every DEK without data loss'),
+  t('T-KEY-2', '7', '§67', 'A revoked KEK can no longer unwrap'),
+  t('T-KEY-3', '7', '§67', 'Backup restore keeps tenant key isolation and re-applies shreds'),
+  t('T-KEY-4', '7', '§67', 'Key compromise drill runs end to end'),
+  t('T-PROC', '2', '§69', 'Every allowlisted host maps to an approved processor; register generated from the registry'),
+  t('T-SLO', '8', '§70', 'Cell refuses live tenants until SLO/RTO/RPO are approved; ACK measured with slow provider'),
+  t('T-SIGNOFF', '18', '§71', 'Sign-offs are auditable human approval records, verified at boot'),
 ];
 
 /** T1–T23 come from the v3.6 resurrection review, which has not been supplied yet (see docs/reference/t-mapping.md). */
