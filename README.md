@@ -20,8 +20,8 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 | 3 | The rules engine: what the customer wants, prices, areas, availability, bookings | ✅ Done |
 | 4 | The instant acknowledgement, and the fact-checker that stops made-up prices or dates | ✅ Done |
 | 5 | The local AI models and how they're scored | ✅ Code done · **your step:** run the model benchmark on the VPS ([how](docs/ops/model-benchmark.md)) |
-| 18 → 6 | Your approvals: questions to you, one-tap approve, nothing sends without it | Next |
-| 7 | Privacy: erasure, data requests, retention, the consent record | Planned |
+| 18 → 6 | Your approvals: questions to you, one-tap approve, nothing sends without it, your inbox app | ✅ Done |
+| 7 | Privacy: erasure, data requests, retention, the consent record | Next |
 | 8 | Measurements and weekly reports | Planned |
 | 9+ | Lifecycle, missed-call texts, finance, complaints, offboarding, learning, hardening | Planned |
 | K1–K6 | **Agent Mode**: the seven agents (BASTION, SENTINEL, LEDGER, VANGUARD, HERALD, COMPASS, FORGE) as plug-in packs | Planned (after approvals are built) |
@@ -41,6 +41,25 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 - **The AI model is optional and boxed in.** The rules decide first; the AI is asked only when the rules aren't sure what a customer wants, and only to pick from a fixed list. If its answer isn't valid, isn't confident, or the AI is down or slow, Sevari carries on exactly as it would without it. The AI can never by itself stop messages to someone, send a safety message or open a complaint: those labels go to you. It is called outside any database transaction, so a slow model can't hold anything up, and the instant acknowledgement never waits for it.
 - **AI wording is opt-in, per message type, and fact-checked.** If you switch it on, the AI may only re-word the facts it's given (your confirmed prices, times, answers). Every word then goes through the same fact-checker; anything unsupported means the fixed template is sent instead. Building the attack tests found a real gap, now closed: a customer writing "quote me £10" could have let a reply repeat "£10". Customers' own prices and numbers are no longer accepted as facts.
 - **Models are chosen by measurement, and only you can switch one on.** A benchmark (run on your VPS) scores each candidate model on your 100 test enquiries plus attack messages. Only a model that passes every gate can be promoted, only by a named person, and the database itself refuses anything else.
+- **Nothing goes to a customer without a human's tap, or an earned permission.**
+  - Every reply is written from your confirmed records and put in your inbox app.
+  - One tap sends it, one tap lets you change it, one tap stops it.
+  - The approval only works once, only for that exact message, and only for 15 minutes. Two people tapping at the same moment still sends one message.
+- **Every answer you give is acknowledged at once and acted on.**
+  - You see "Approved, sending now", then "Sent to the customer at 10:02", or exactly why not.
+  - Silence never approves. Unanswered questions move to the next person on your list, if you set one, and you are told. At the deadline they close safely: nothing is sent.
+  - If a reply is still waiting at the time you promised customers, they get one polite "still looking at it" message, and nothing else.
+- **Edits are checked.** If your edit changes a fact (say a price), Sevari asks once: "just for this customer, or update your records?" It never quietly changes your records. If your records changed after a reply was written, the old reply is not sent.
+- **Team members only approve what you allow.**
+  - You decide which kinds of message each person may approve.
+  - Veylith logins can never approve anything for your business.
+  - Legal sign-offs need two named people (a lawyer and you). The app refuses to start if a settings file claims a sign-off that has no record behind it.
+- **Automatic sending has to be earned and can't be forced.**
+  - A kind of message can only send without asking after a clean track record of 50 messages, and only if you say yes.
+  - Any complaint or failed fact check switches it straight back off.
+  - Refunds, payment requests and cancellations can never be automatic: the database itself refuses.
+- **Sending survives crashes.** Tests kill the worker halfway through sending, lose the provider's reply, and send duplicate webhooks. Every time, the customer gets exactly one message, or you are told it needs checking. Sevari never guesses and never re-sends blindly.
+- **Your inbox app** works on a phone (tested in a real browser at phone size), loads nothing from other websites, and shows what's waiting and what happened.
 - Sevari can't connect to any outside service unless you've approved that supplier. This is enforced three ways: in the code, by a gatekeeper process, and by the server's firewall (proven by a test). The supplier list (processor register) is generated automatically and currently says: no suppliers approved yet.
 
 **Your decisions of 14 October (contract v1.12, Part L):**
@@ -91,11 +110,15 @@ packages/
   grounding/          the fact-checker: claims extraction, normalisation, service/commitment checks; GroundedDraft
   templates/          fixed message wording (ACK, safety, holding, clarify), GSM-7 / segment caps
   outbound/           outbox (reserved → sending → sent / ambiguous / failed / blocked), reconcile, suppression, reply records
+  approvals/          single-use, expiring, digest-bound approvals (§7.1), consumed in one statement
+  autonomy/           reserved decisions (frozen), never-grantable classes, earned grants, kill switch (§7.2, INV-11)
+  hitl/               structured questions, answers, acknowledgements, effect receipts, escalation sweep (§30, §74)
+  identity/           tenant user and operator credentials, platform decisions, two-person sign-offs (§71, §82)
   llm/                model layer: provider port (Ollama via egress, VSAP stub, fake), versioned prompts, schema-checked tasks, registry selection, grounded model drafts
-apps/worker/          queue runner (NOTIFY wake-up, bounded concurrency); inbound.process; ack.send
+apps/worker/          queue runner (NOTIFY wake-up, bounded concurrency); inbound.process; ack.send; enquiry.respond; draft.dispatch; outbox.reconcile; hitl.sweep; answer consumers
 eval/                 100-case labelled corpus, knowledge fixtures, runner, reports, accepted baseline
 eval/models/          model benchmark (run on the target box), injection set, BENCHMARK.md, results/
-apps/api/             Fastify server: /v1/inbound/:channel/:publicId, health, CORS for forms, rate limits
+apps/api/             Fastify server: /v1/inbound/:channel/:publicId, health, CORS for forms, rate limits; owner API (/v1/owner/*), platform decisions, the owner inbox app (/app)
 ops/nftables/         default-deny outbound firewall + a namespace test that proves it
 config/
   regions/uk.yaml     UK rule pack (counsel_signoff: null until counsel signs)
@@ -149,7 +172,7 @@ pnpm models:registry list|register|promote|retire   # owner role; promotion need
 - `contract-progress`: every contract test, red included, plus the status table. Informational.
 
 ### Contract test status
-Run `pnpm contract:status` for the live table. After Phase 5: F1 (database and API), F3 (grounding, property-based), F3H (holdout harness; starter cases only, DEV-009), F7 (ACK latency), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LLM, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
+Run `pnpm contract:status` for the live table. After Phases 6 and 18: F6, F8, T-RES, T-CHAOS, F22–F27, F46–F58 and T-SIGNOFF join F1 (database and API), F3 (grounding, property-based), F3H (holdout harness; starter cases only, DEV-009), F7 (ACK latency), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LLM, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
 
 ### Documents
 - [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md): the binding contract (v1.13)

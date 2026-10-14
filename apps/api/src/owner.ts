@@ -4,6 +4,8 @@
  *   /v1/platform/*   an operator credential. Tenant credentials are refused and audited (F56).
  * Answers are acknowledged in the response itself (the in-app channel, §74.1) and in the inbox.
  */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { Clock } from '@sevari/clock';
@@ -35,7 +37,22 @@ const json = (req: FastifyRequest): unknown => {
   }
 };
 
+const PUBLIC_DIR = join(import.meta.dirname, '..', 'public');
+/** The owner app's static files (Phase 6 inbox). Same-origin only: no third-party scripts, fonts or trackers. */
+const APP_FILES: Readonly<Record<string, { file: string; type: string }>> = {
+  '/app': { file: 'app.html', type: 'text/html; charset=utf-8' },
+  '/app/app.js': { file: 'app.js', type: 'text/javascript; charset=utf-8' },
+  '/app/app.css': { file: 'app.css', type: 'text/css; charset=utf-8' },
+  '/app/manifest.webmanifest': { file: 'manifest.webmanifest', type: 'application/manifest+json' },
+  '/app/icon.svg': { file: 'icon.svg', type: 'image/svg+xml' },
+};
+const APP_CSP = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; manifest-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+
 export function registerOwnerRoutes(app: FastifyInstance, deps: OwnerDeps): void {
+  for (const [path, f] of Object.entries(APP_FILES)) {
+    app.get(path, async (_req, reply) => reply.header('content-security-policy', APP_CSP).type(f.type).send(await readFile(join(PUBLIC_DIR, f.file))));
+  }
+
   const userOnly = async (req: FastifyRequest, reply: FastifyReply): Promise<Extract<Credential, { kind: 'user' }> | null> => {
     const cred = await authenticate(deps.db, deps.clock, bearer(req));
     if (!cred) {

@@ -24,7 +24,8 @@ const CHANNELS: ReadonlySet<string> = new Set(['webform', 'email', 'sms', 'api']
 const MAX_BODY = 256 * 1024;
 
 function securityHeaders(reply: FastifyReply): void {
-  reply.header('content-security-policy', "default-src 'none'; frame-ancestors 'none'");
+  // The owner app sets its own (still strict, same-origin only) policy; everything else is locked down.
+  if (!reply.hasHeader('content-security-policy')) reply.header('content-security-policy', "default-src 'none'; frame-ancestors 'none'");
   reply.header('x-content-type-options', 'nosniff');
   reply.header('referrer-policy', 'no-referrer');
   reply.header('strict-transport-security', 'max-age=63072000; includeSubDomains');

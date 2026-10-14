@@ -34,8 +34,8 @@ export class FakeProvider implements OutboundProvider {
   readonly name = 'fake';
   readonly channels = ['email', 'sms'] as const;
   readonly egressHosts: readonly string[] = [];
-  readonly supportsIdempotencyKey = true;
-  readonly supportsLookup = true;
+  readonly supportsIdempotencyKey: boolean = true;
+  readonly supportsLookup: boolean = true;
   readonly accepted = new Map<string, { providerMessageId: string; env: OutboundEnvelope; at: number }>();
   /** Number of provider-side deliveries (a non-idempotent provider would deliver twice). */
   deliveries = 0;

@@ -26,6 +26,11 @@ export default tseslint.config(
     languageOptions: { globals: { process: 'readonly', console: 'readonly' } },
   },
   {
+    // The owner app runs in the browser (same-origin only, strict CSP).
+    files: ['apps/api/public/**/*.js'],
+    languageOptions: { globals: { document: 'readonly', sessionStorage: 'readonly', fetch: 'readonly', setInterval: 'readonly' } },
+  },
+  {
     files: ['**/test/**/*.ts', 'tests/**/*.ts', 'scripts/**/*.ts', 'eval/**/*.ts'],
     rules: { 'no-console': 'off', '@typescript-eslint/no-non-null-assertion': 'off' },
   },
