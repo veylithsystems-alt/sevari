@@ -2,13 +2,13 @@
 
 The operations layer for service businesses: it takes in every enquiry, works out what's true, replies, books, bills and keeps the records. It automates everything that can lawfully be automated, and hands everything else to a human with the facts already gathered.
 
-Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md) (v1.11). If the code and the contract disagree, the code is wrong or the contract needs amending.
+Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md) (v1.12). If the code and the contract disagree, the code is wrong or the contract needs amending.
 
 ---
 
 ## For Dan: where things stand (plain English)
 
-**Last updated:** 14 October 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.11
+**Last updated:** 14 October 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.12
 
 **Status: build in progress.** Under contract Part J there are three separate milestones: *build-complete* (code and tests done), *production-approved* (deployment, recovery, security, support, legal documents all proven: [`docs/readiness/`](docs/readiness/README.md)), and *commercially launched* (pilots prove the product is worth paying for: the Value Gate). Passing automated tests is **not** evidence that Sevari is ready for paying customers.
 
@@ -42,6 +42,13 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 - **AI wording is opt-in, per message type, and fact-checked.** If you switch it on, the AI may only re-word the facts it's given (your confirmed prices, times, answers). Every word then goes through the same fact-checker; anything unsupported means the fixed template is sent instead. Building the attack tests found a real gap, now closed: a customer writing "quote me £10" could have let a reply repeat "£10". Customers' own prices and numbers are no longer accepted as facts.
 - **Models are chosen by measurement, and only you can switch one on.** A benchmark (run on your VPS) scores each candidate model on your 100 test enquiries plus attack messages. Only a model that passes every gate can be promoted, only by a named person, and the database itself refuses anything else.
 - Sevari can't connect to any outside service unless you've approved that supplier. This is enforced three ways: in the code, by a gatekeeper process, and by the server's firewall (proven by a test). The supplier list (processor register) is generated automatically and currently says: no suppliers approved yet.
+
+**Your decisions of 14 October (contract v1.12, Part L):**
+- New businesses can go live within the hour: they answer the questions, an automatic checklist runs, and their own "go live" tap starts Sevari in "ask me first" mode. You only approve regulated trades.
+- You decide product and build exceptions; each business owner decides their own, and can add their own team members with their own logins. Silence still never approves, and Veylith never approves for a business.
+- Sevari is for any service business, not one type: onboarding builds a pack for each new kind of business, which the owner confirms. Sevari finds its own customers within the law: answering Veylith's own enquiries, approved content, opted-in leads. Cold outreach stays off until a lawyer signs off.
+- FORGE (the code agent) is deferred until there's a GPU server.
+- How your original vision lines up with the contract: [`docs/reference/original-vision.md`](docs/reference/original-vision.md) §7.
 
 **Things I found that you should know:**
 - Your old n8n build (v3.6 / v4.1) has 16 bugs I've written up in [`docs/reference/v4.1-behaviours.md`](docs/reference/v4.1-behaviours.md). The serious ones: the "tamper-proof" record could be changed without detection; an approval for one message could be used to send a different one; the approval page could run attacker-supplied code; the encryption step stored data unencrypted if its key was missing; and the erasure step failed with an error. The new build is designed so each of these can't happen, and has a test for each.
@@ -139,7 +146,7 @@ pnpm models:registry list|register|promote|retire   # owner role; promotion need
 Run `pnpm contract:status` for the live table. After Phase 5: F1 (database and API), F3 (grounding, property-based), F3H (holdout harness; starter cases only, DEV-009), F7 (ACK latency), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LLM, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
 
 ### Documents
-- [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md): the binding contract (v1.11)
+- [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md): the binding contract (v1.12)
 - [`docs/ops/model-benchmark.md`](docs/ops/model-benchmark.md): how to benchmark and switch on a model on the VPS
 - [`docs/CONTRACT_REVIEW.md`](docs/CONTRACT_REVIEW.md): proposed amendments
 - [`docs/readiness/README.md`](docs/readiness/README.md): Production Readiness and Value Gate tracker

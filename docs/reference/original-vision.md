@@ -110,3 +110,6 @@ Dan asked: are the vision and the contract aligned, can the vision come true, an
 | "Incorporation triggered by the first Stripe payment" | The contracting party, DPA, ICO fee and Twilio bundle all depend on the entity, and must be settled before the first customer's data is processed | Decide the entity before the first pilot (Q-4) |
 | "Digital content activation waiver" refund policy | Most customers are businesses, not consumers, so consumer cancellation rules may not apply; sole traders acting for their business usually aren't consumers | Counsel drafts the terms (PR-8) |
 | "GDPR, CCPA, PIPEDA, LGPD covered" | Unverified (C-8) | Name only what counsel has confirmed |
+
+### 7.4 Decided by Dan, 14 Oct 2026 (contract v1.12, Part L)
+- C-13: fast but safe go-live (§81). C-14: any service business, with a pack builder; Sevari finds its own audience within the law, D3 unchanged (§83). C-15: two authority scopes, Dan for product and build exceptions, the business owner for their own (§82). C-20: FORGE deferred (§84). C-16: claims wording into the register (§85).

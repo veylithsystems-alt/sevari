@@ -1,6 +1,6 @@
 # sevari-core — Build Contract for Claude Code
 
-Version 1.11 · 14 October 2026 (Part K: Agent Mode and acknowledging every human input, binding on Dan's merge; Part J: definition of finished, production readiness, value gate, delivery ambiguity, key management, grounding holdout, processor registry, recovery, legal precision; Part I: Twilio ADR draft answers; Part H: build checklist and Twilio ADR requirements; Part G: capacity and cost-floor model; missed-call text adapter confirmed, Part F; D1 and D3 confirmed; Part D: market, beachhead, trades; Part E: pilot market, pricing and outreach; Appendices 1–2: go-to-market and pilot plans) (Part B: full lifecycle §16–§27; Part C: decisions, human feedback, governed self-learning, platform hardening §28–§40) · Owner: Dan Hadfield (Veylith Systems)
+Version 1.12 · 14 October 2026 (Part L: vision alignment — fast safe go-live, two authority scopes, any service business and self-sourced audience, FORGE deferred, claims wording; Part K: Agent Mode and acknowledging every human input, binding on Dan's merge; Part J: definition of finished, production readiness, value gate, delivery ambiguity, key management, grounding holdout, processor registry, recovery, legal precision; Part I: Twilio ADR draft answers; Part H: build checklist and Twilio ADR requirements; Part G: capacity and cost-floor model; missed-call text adapter confirmed, Part F; D1 and D3 confirmed; Part D: market, beachhead, trades; Part E: pilot market, pricing and outreach; Appendices 1–2: go-to-market and pilot plans) (Part B: full lifecycle §16–§27; Part C: decisions, human feedback, governed self-learning, platform hardening §28–§40) · Owner: Dan Hadfield (Veylith Systems)
 Status: binding on every pull request. If the code and this contract disagree, the code is wrong or the contract needs to be amended (§14). Nothing in between counts.
 
 ---
@@ -1382,10 +1382,57 @@ Tests:
 
 1. HERALD's publishing channels (for example LinkedIn, X, a website CMS): each needs a provider ADR.
 2. COMPASS's first source types (for example Companies House, public tenders, industry news feeds).
-3. FORGE: in scope for the first commercial release, or later?
+3. ~~FORGE: in scope for the first commercial release, or later?~~ **Decided 14 Oct 2026: deferred (§84).**
 4. Which plan includes which agents (prices are data, §47; three price lists exist, Q-2).
 
 ---
+---
+
+# PART L — Vision alignment decisions (added in v1.12)
+
+Source: Dan's decisions of 14 October 2026, after comparing the Product Brief, Design Brief v2.2 and Synchronicity v1.0 with this contract (`docs/reference/original-vision.md` §7). Part L overrides earlier parts where they conflict. **Constitutional amendment note (§14):** §81 clarifies §8.3 ("activating a customer" stays always-human; §81 says *which* human for each case). Nothing in §3 or §8.3 is loosened: no activation, approval or exception can ever be made by configuration, timeout or a model.
+
+## 81. Fast, safe go-live (amends §18, T-ONB-1, T-ONB-3)
+
+Target from the Product Brief: a new business answers the onboarding questions in about ten minutes and its first enquiry is handled within an hour of sign-up, with no setup call.
+
+1. The onboarding interview (§18 step 2) produces typed knowledge records that the owner previews and confirms (I5, unchanged).
+2. An **automatic go-live checklist** runs: confirmed business record (name, reply-time promise, privacy notice link); at least one service; hours; area; every price either confirmed or explicitly "on inspection"; at least one channel verified with a test message; a synthetic test enquiry set passed with zero grounding failures; the pack is not `regulated: true`.
+3. When the checklist passes, the **owner's own "go live" tap** (a typed human decision, §30, acknowledged and acted on, §74) activates **Assist mode**: the deterministic acknowledgement goes out automatically (§5.2), and every other reply waits for an approval.
+4. **Shadow mode** (§18 step 5) becomes an option the owner can choose, recommended in the onboarding flow, not a required wait. If chosen, leaving it is still a human decision (T-ONB-3 unchanged for tenants in shadow mode).
+5. **Veylith's (Dan's) approval** is still required to activate a tenant whose pack is `regulated: true`, or whose onboarding detected a regulated activity (§83.4), and for anything listed as a platform exception in §82.
+6. Measured: sign-up → first acknowledged enquiry, and sign-up → go-live, per tenant (metrics, §10.3).
+
+Tests: **T-ONB-1** (amended) no activation without the checklist plus a human decision by the tenant's owner, or by Veylith where §81.5 applies. **T-ONB-4** a regulated or regulated-detected tenant can't be activated by its owner alone. **T-ONB-5** a failed checklist item blocks the go-live tap and says exactly what's missing.
+
+## 82. Who decides exceptions: two authority scopes (amends §7, §30, §74; answers Q-17)
+
+- **Platform scope (Veylith, Dan as founder and CEO; never delegable):** product and build exceptions. Constitutional amendments, reserved decisions at platform level (§8.3), platform ceilings on what any tenant may automate, regulated verticals and regulated-detected tenants (§81.5), processors and egress (§29, §69), model promotion (§9), learning-gate promotions (§31), outbound tier changes (D3), and cross-tenant or operator access (break-glass, audited). Platform decisions can be made only by an operator credential with Dan's identity.
+- **Tenant scope (the business owner; multi-tenant gated and credentialed):** the tenant's own exceptions. Approvals for its own drafts and actions, its own autonomy grants within the platform ceilings (§7.2), its own go-live (§81), and which of its own users may do what.
+  - The owner can add **team members** to their tenant, each with their own login (passkey per R-12) and a role: owner, approver (limited to the action classes the owner chooses), or viewer.
+  - The owner can set an **escalation order**: if an approval isn't answered within a delay the owner chooses, it is offered to the next authorised team member. Each person must **actively** approve; silence never approves (INV-14), and every hand-over is acknowledged to the owner (§74).
+  - Money classes (§19) are owner-only unless the owner explicitly grants a named team member that right.
+  - A tenant's users never see or act on another tenant (INV-1). **Veylith never approves anything on a tenant's behalf.** Support access is read-only, time-limited, consented by the owner and audited.
+
+Tests: **F55** a tenant approver can't approve an action class the owner didn't grant them. **F56** a platform decision attempted with a tenant credential (any role) is refused and audited. **F57** an unanswered approval escalates in the owner's order, is never approved by the timeout, and every hand-over produces an acknowledgement. **F58** no Veylith or operator credential can approve a tenant action.
+
+## 83. Any service business, and Sevari finds its own audience (amends Part D, §9; answers Q-16)
+
+1. **Not limited to one audience.** The five trades remain the first pilot packs (Part D), but the product is for any service business or individual. A **generic service pack** handles the core intents (enquiry, price, booking, availability, follow-up, complaint, opt-out, data rights, thanks) for any sector.
+2. **Pack builder.** The onboarding interview drafts a tenant-specific pack (services and their everyday names, the questions to ask, slots, templates) from the owner's answers. The owner confirms it (I5). It is evaluated against synthetic test enquiries generated from it before go-live (§81.2). Packs that prove useful across tenants can be promoted to the shared catalogue (§36.1) through the learning gate (§31), with no customer data moving between tenants (§31.4).
+3. **Sevari sources its own audience, within the law (D3 unchanged).** Veylith runs as **tenant zero** (R-22): Sevari answers Veylith's own enquiries ("talk to Sevari herself"). HERALD drafts content from Veylith's own material and posts after approval or an earned grant. Opted-in leads (waitlist, newsletter, demo requests) are followed up under Tier B. Everything is automated except the decisions §8.3 and Part K keep human. Cold outreach (Tier C and beyond) stays off until counsel signs off per region, with an ADR and Dan's decision (D3). No scraping or collection of personal data from sources outside the source register (§17.1, §80).
+4. **Regulated-activity detection.** Onboarding answers, company records (where an ADR allows, R-20) and service names are checked against a maintained list of regulated activities. A match sets `regulated: true` and routes activation to Veylith (§81.5). Examples: gas, electrical, childcare and childminding (children's data, Ofsted), health, legal, finance. Counsel confirms the list.
+
+Tests: **T-PACK-1** a drafted pack can't go live until the owner confirms it and its synthetic test set passes. **T-PACK-2** a regulated-activity match blocks owner-only activation.
+
+## 84. FORGE deferred (answers Q-18 and §80 item 3)
+
+FORGE keeps its name and its place in the Agent Mode design (Part K). It is **not built or sold** until there is in-cell GPU inference and a defined use for service businesses, under its own contract part. Phase K6 is deferred. Plans and copy must not offer it until then.
+
+## 85. Claims wording (adds to §43)
+
+The ten statements listed in `docs/reference/original-vision.md` §7.3 go into the claims register with their evidence or a "do not publish until counsel confirms" status. Public copy uses the true versions given there.
+
 ---
 
 # APPENDIX 1 — UK go-to-market plan (inbound and opt-in only)
