@@ -59,12 +59,26 @@ contractSuite('T-BOOT', () => {
     }
   });
 
-  it('refuses when the app role has been given BYPASSRLS', async () => {
-    await f.superQuery('ALTER ROLE sevari_app BYPASSRLS');
+  it('refuses when it runs as a role with BYPASSRLS', async () => {
+    // Roles are cluster-wide: never alter the shared sevari_app role in a test (it would switch off RLS
+    // for every test running in parallel). Use a throwaway role instead.
+    const role = `boot_bypass_${Math.random().toString(36).slice(2, 10)}`;
+    await f.superQuery(`CREATE ROLE ${role} LOGIN PASSWORD 'bypass_test_only' BYPASSRLS NOSUPERUSER`);
+    await f.superQuery(`GRANT CONNECT ON DATABASE ${iso.database} TO ${role}`);
+    await f.superQuery(`GRANT USAGE ON SCHEMA public, sevari_meta TO ${role}`);
+    await f.superQuery(`GRANT SELECT ON ALL TABLES IN SCHEMA public TO ${role}`);
+    const u = new URL(iso.appUrl);
+    u.username = role;
+    u.password = 'bypass_test_only';
+    const bypass = connect(u.toString());
     try {
-      expect(await failing(deps)).toContain('db.role');
+      expect(await failing({ ...deps, db: bypass.db })).toContain('db.role');
     } finally {
-      await f.superQuery('ALTER ROLE sevari_app NOBYPASSRLS');
+      await bypass.close();
+      await f.superQuery(`REVOKE ALL ON ALL TABLES IN SCHEMA public FROM ${role}`);
+      await f.superQuery(`REVOKE ALL ON SCHEMA public, sevari_meta FROM ${role}`);
+      await f.superQuery(`REVOKE ALL ON DATABASE ${iso.database} FROM ${role}`);
+      await f.superQuery(`DROP ROLE ${role}`);
     }
   });
 

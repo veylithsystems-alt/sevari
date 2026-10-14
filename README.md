@@ -18,8 +18,8 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 | 1 | The secure database: businesses can never see each other's data, data stays in its region, the tamper-proof record, encryption | ✅ Done |
 | 2 | Receiving enquiries (web form, email, SMS, API), the outbound-connection guard and firewall, the supplier register | ✅ Done |
 | 3 | The rules engine: what the customer wants, prices, areas, availability, bookings | ✅ Done |
-| 4 | The instant acknowledgement, and the fact-checker that stops made-up prices or dates | Next |
-| 5 | The local AI models and how they're scored | Planned |
+| 4 | The instant acknowledgement, and the fact-checker that stops made-up prices or dates | ✅ Done |
+| 5 | The local AI models and how they're scored | Next |
 | 18 → 6 | Your approvals: questions to you, one-tap approve, nothing sends without it | Planned |
 | 7 | Privacy: erasure, data requests, retention, the consent record | Planned |
 | 8 | Measurements and weekly reports | Planned |
@@ -35,6 +35,9 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 - Enquiries arrive from website forms, email, SMS and the API. Each one is checked for a valid signature, stored encrypted, and queued in a single step. Sending the same message twice never creates a duplicate.
 - The rules engine reads each enquiry and works out the job, the postcode area, how urgent it is, whether you cover it, and what your price and availability records say. It never invents a price: if your records don't say, it marks the question as unknown for you. On 100 test enquiries across your five trades, it routes 94% correctly. It caught **every** danger-to-life case and **every** complaint, legal threat or data request. When it's unsure, it asks the customer a question rather than guessing, and after two tries it hands over to you.
 - Your business facts (prices, hours, areas, services) only count once you've confirmed them. Every change keeps its history, so any past reply can be checked against exactly what was true at the time.
+- Every customer gets an instant acknowledgement, in your business's name, with your reply-time promise and privacy link. The speed test: 20 enquiries at once, with the server's processor flat out, all acknowledged in under half a second; even with a slow text/email provider, under 5 seconds (target: 10 seconds). Someone who texts STOP is never messaged again. Anyone describing a danger to life gets the safety message (call 999, the gas emergency number). Complaints and legal threats get a polite holding reply and go straight to you.
+- Nothing can reach a customer unless it passes the fact-checker. Every price, date, time, phone number, link, postcode, number, promise ("guaranteed", "same day", "free", "refund"...) and "we do / we don't do" statement must match your confirmed records or the customer's own words. Otherwise the message is blocked, never quietly edited. It was tested against thousands of generated fake values and every one was caught.
+- Sending is crash-safe. If the system stops halfway through sending, it checks with the provider before trying again, so customers don't get duplicates. Payment and booking messages are never retried automatically; they come to you.
 - Sevari can't connect to any outside service unless you've approved that supplier. This is enforced three ways: in the code, by a gatekeeper process, and by the server's firewall (proven by a test). The supplier list (processor register) is generated automatically and currently says: no suppliers approved yet.
 
 **Things I found that you should know:**
@@ -69,7 +72,10 @@ packages/
   intake/             receive → authenticate → persist encrypted → queue, in one transaction; endpoints and API keys
   knowledge/          owner-confirmed, versioned knowledge records; point-in-time snapshots (replay)
   verticals/          the five trade packs (data, not code)
-apps/worker/          queue runner; inbound.process = the deterministic core per message
+  grounding/          the fact-checker: claims extraction, normalisation, service/commitment checks; GroundedDraft
+  templates/          fixed message wording (ACK, safety, holding, clarify), GSM-7 / segment caps
+  outbound/           outbox (reserved → sending → sent / ambiguous / failed / blocked), reconcile, suppression, reply records
+apps/worker/          queue runner (NOTIFY wake-up, bounded concurrency); inbound.process; ack.send
 eval/                 100-case labelled corpus, knowledge fixtures, runner, reports, accepted baseline
 apps/api/             Fastify server: /v1/inbound/:channel/:publicId, health, CORS for forms, rate limits
 ops/nftables/         default-deny outbound firewall + a namespace test that proves it
@@ -115,7 +121,7 @@ pnpm eval             # corpus evaluation → eval/reports/<date>.md (--check fa
 - `contract-progress`: every contract test, red included, plus the status table. Informational.
 
 ### Contract test status
-Run `pnpm contract:status` for the live table. After Phase 3: F1 (database and API), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
+Run `pnpm contract:status` for the live table. After Phase 4: F1 (database and API), F3 (grounding, property-based), F3H (holdout harness; starter cases only, DEV-009), F7 (ACK latency), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
 
 ### Documents
 - [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md): the binding contract (v1.9)

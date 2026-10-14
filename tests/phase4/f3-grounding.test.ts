@@ -34,7 +34,7 @@ contractSuite('F3', () => {
 
   it('property: any injected price not in the facts is blocked', () => {
     fc.assert(fc.property(fc.integer({ min: 1, max: 5_000_000 }), (minor) => {
-      fc.pre(!supportedKeys.has(`money:${minor}`));
+      fc.pre(![...supportedKeys].some((k) => k.startsWith(`money:${minor}:`)));
       const pounds = (minor / 100).toFixed(2);
       for (const shown of [`£${pounds}`, `£${Number(pounds).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`, `${pounds} pounds`]) {
         expect(check(`The job will cost ${shown} in total.`).ok, shown).toBe(false);
@@ -115,7 +115,7 @@ describe('[F3] claim extraction details', () => {
   it('extracts each kind once, in normalised form', () => {
     const keys = extractClaims('£1,250.50 on 14th Oct at 2:30pm, ring 0151 000 0000 or a@b.co.uk, CH65 2AB, 20% and 3 vans. https://x.example.com/p', ctx).map(claimKey);
     expect(keys).toEqual(expect.arrayContaining([
-      'money:125050', 'date:2026-10-14', 'time:14:30', 'phone:+441510000000', 'email:a@b.co.uk', 'postcode:CH65 2AB', 'percent:20', 'number:3', 'host:x.example.com',
+      'money:125050:flat', 'date:2026-10-14', 'time:14:30', 'phone:+441510000000', 'email:a@b.co.uk', 'postcode:CH65 2AB', 'percent:20', 'number:3', 'host:x.example.com',
     ]));
   });
 });

@@ -16,3 +16,5 @@ Open decisions found while building. None of them block Phases 0–8. Each has a
 | Q-10 | Hosting provider for the UK cell: IONOS UK (from the Synchronicity design)? | Yes, recorded as a processor with an ADR (§69) | Processor registry, Phase 2 |
 | Q-11 | ✅ Answered 14 Oct: silence never approves; customers always get an automatic acknowledgement; every human input is acknowledged and acted on (Part K §74). AI disclosure where required (§8.4) | | |
 | Q-12 | Part K §80: HERALD channels, COMPASS first sources, FORGE timing, which plan includes which agents | Decide before phases K4–K6 | Agent Mode later phases |
+| Q-13 | Write (or commission) the independent adversarial holdout cases for `eval/holdout/` (format in its README). The builder can't write them without defeating their purpose | Even 30–50 cases from you, written from real customer messages you've seen, would be valuable | Release (§68) |
+| Q-14 | Confirm the ACK target: p95 ≤ 10 seconds measured with the model busy and a slow provider (§70). Measured on the build machine: p95 0.49s and 4.8s | Keep 10s for pilots; consider tightening to 5s once measured on the VPS | Baseline |

@@ -104,15 +104,23 @@ describe('[Phase 3] worker: inbound.process end to end', () => {
     const ts = Math.floor(clock.nowMs() / 1000);
     return receiveInbound(intake, { channel: 'email', publicId: email.publicId, raw: { body, headers: { 'x-sevari-timestamp': String(ts), 'x-sevari-signature': signWebhook(email.secret, ts, body) }, url: 'x' } });
   };
+  const until = async <T>(probe: () => Promise<T | undefined>): Promise<T | undefined> => {
+    for (let i = 0; i < 100; i++) {
+      const v = await probe();
+      if (v) return v;
+      await runOnce(runner, 50);
+    }
+    return probe();
+  };
   const enquiryFor = (messageId: string) => withTenant(h.db, t, (tx) => tx.selectFrom('enquiries').selectAll().where('message_id', '=', messageId).executeTakeFirst());
 
   it('analyses a queued message, stores the result with citations, and queues the reply step', async () => {
     const r = await send(`m-${randomUUID()}`, 'Can you come and unblock my drain today? CH65 2AB');
     expect(r.status).toBe('accepted');
     const id = r.status === 'accepted' ? r.messageId : '';
-    // Drain everything queued so far (other tests share the cell queue).
-    while ((await runOnce(runner, 50)).done > 0) { /* loop */ }
-    const e = await enquiryFor(id);
+    // Other test files share the cell queue (and some of their jobs fail on purpose), so run the worker
+    // until this message's analysis exists, with a deadline, rather than until a batch is empty.
+    const e = await until(() => enquiryFor(id));
     expect(e).toMatchObject({ intent: 'booking_request', route: 'answer', services: ['blocked_drain'], eligibility: 'yes', pack_id: 'drainage' });
     expect(e!.facts_used.length).toBeGreaterThan(0);
     const respond = await withTenant(h.db, t, (tx) => tx.selectFrom('job_queue').select('payload').where('kind', '=', RESPOND_JOB).where('dedupe_key', '=', e!.id).executeTakeFirst());
@@ -150,7 +158,7 @@ describe('[Phase 3] worker: inbound.process end to end', () => {
     expect(claimed.some((j) => j.payload['message_id'] === id)).toBe(true);
     await new Promise((res) => setTimeout(res, 20));
     expect(await queue.reapExpired()).toBeGreaterThan(0);
-    while ((await runOnce(runner, 50)).done > 0) { /* loop */ }
+    await until(() => enquiryFor(id));
     const rows = await withTenant(h.db, t, (tx) => tx.selectFrom('enquiries').select('id').where('message_id', '=', id).execute());
     expect(rows).toHaveLength(1);
   });

@@ -64,7 +64,15 @@ export function extractClaims(text: string, ctx: ExtractContext): Claim[] {
   take(/£\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?\b|\b(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?\s?(?:pounds|quid|gbp)\b/i, (m) => {
     const whole = (m[1] ?? m[3] ?? '0').replace(/,/g, '');
     const frac = (m[2] ?? m[4] ?? '').padEnd(2, '0');
-    return { kind: 'money', value: String(Number(whole) * 100 + Number(frac || '0')), raw: m[0] };
+    // A price is bound to its basis: "£60 an hour" is not "£60 for the job" (§68 misleading combinations).
+    const start = m.index ?? 0;
+    const before = text.slice(Math.max(0, start - 12), start).toLowerCase();
+    const after = text.slice(start + m[0].length, start + m[0].length + 24).toLowerCase();
+    const basis = /^\s*(an hour|a hour|per hour|\/\s?h(ou)?r|hourly|ph\b)/.test(after) ? 'hourly'
+      : /^\s*(per|a|each)\s(panel|metre|meter|m2|sq|square|item|door|window|lock|tile|day)/.test(after) ? 'per_unit'
+        : /(from|starting at|starts at)\s*$/.test(before) ? 'from'
+          : 'flat';
+    return { kind: 'money', value: `${Number(whole) * 100 + Number(frac || '0')}:${basis}`, raw: m[0] };
   });
   take(/\b(\d{1,3}(?:\.\d+)?)\s?(?:%|per ?cent)/i, (m) => ({ kind: 'percent', value: String(Number(m[1])), raw: m[0] }));
   // Dates: 14th October (2026), 14 Oct, 14/10(/2026), weekday names, today, tomorrow.

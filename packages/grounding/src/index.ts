@@ -12,6 +12,7 @@
  */
 import { normaliseForMatch, hasPhrase } from '@sevari/domain';
 import { claimKey, extractClaims, type Claim, type ExtractContext } from './claims.ts';
+import { checkCommitments, checkServiceClaims, type ServiceFact } from './semantic.ts';
 
 declare const groundedBrand: unique symbol;
 const GROUNDED: unique symbol = Symbol('sevari.grounded');
@@ -33,10 +34,12 @@ export interface GroundingSources {
   readonly factIds: readonly string[];
   /** The customer's own words: values they gave may be echoed back. */
   readonly customerText: string;
+  /** Structured service facts, for "we do / we don't do" claims (§68). */
+  readonly services?: readonly ServiceFact[];
 }
 
 export interface GroundingFailure {
-  readonly rule: 'unsupported_claim' | 'special_category' | 'marketing_language' | 'empty';
+  readonly rule: 'unsupported_claim' | 'special_category' | 'marketing_language' | 'empty' | 'service_claim' | 'commitment';
   readonly detail: string;
 }
 
@@ -45,7 +48,7 @@ export type GroundingResult =
   | { readonly ok: false; readonly failures: readonly GroundingFailure[]; readonly claims: readonly Claim[] };
 
 const SPECIAL = ['pregnant', 'pregnancy', 'cancer', 'hiv', 'disabled', 'disability', 'dementia', 'mental health', 'religion', 'muslim', 'christian', 'jewish', 'sikh', 'hindu', 'gay', 'lesbian', 'bisexual', 'transgender', 'trade union', 'criminal record', 'ethnicity', 'race'];
-const MARKETING = ['offer', 'offers', 'discount', 'sale', 'deal', 'deals', 'promotion', 'promo', 'limited time', 'special price', 'exclusive', 'free gift', 'voucher', 'subscribe', 'newsletter', 'follow us', 'refer a friend', '% off', 'percent off', 'book now and save'];
+const MARKETING = ['special offer', 'offer ends', 'discount', 'sale', 'deal', 'deals', 'promotion', 'promo', 'limited time', 'special price', 'exclusive', 'free gift', 'voucher', 'subscribe', 'newsletter', 'follow us', 'refer a friend', '% off', 'percent off', 'book now and save'];
 
 export function ground(text: string, purpose: MessagePurpose, sources: GroundingSources, ctx: ExtractContext): GroundingResult {
   const failures: GroundingFailure[] = [];
@@ -54,8 +57,7 @@ export function ground(text: string, purpose: MessagePurpose, sources: Grounding
 
   const supported = new Set<string>();
   for (const t of [...sources.factTexts, sources.customerText]) for (const c of extractClaims(t, ctx)) supported.add(claimKey(c));
-  // A money amount also supports the same figure written as a plain number ("95" for "£95").
-  for (const k of [...supported]) if (k.startsWith('money:')) supported.add(`number:${Number(k.slice(6)) / 100}`);
+  // No cross-kind support: "£60 an hour" supports "£60 an hour", never a bare "60" ("60 engineers").
   for (const c of claims) {
     if (!supported.has(claimKey(c))) failures.push({ rule: 'unsupported_claim', detail: `${c.kind} "${c.raw}" is not in the authorised facts or the customer's message` });
   }
@@ -73,6 +75,9 @@ export function ground(text: string, purpose: MessagePurpose, sources: Grounding
     }
   }
 
+  failures.push(...checkServiceClaims(text, sources.services ?? []));
+  failures.push(...checkCommitments(text, sources.factTexts.join(' \n ')));
+
   if (failures.length) return { ok: false, failures, claims };
   const draft = { text, purpose, claims, factsUsed: [...sources.factIds], [GROUNDED]: true } as unknown as GroundedDraft;
   return { ok: true, draft };
@@ -84,3 +89,4 @@ export function isGroundedDraft(v: unknown): v is GroundedDraft {
 }
 
 export { extractClaims, claimKey, type Claim, type ClaimKind } from './claims.ts';
+export { COMMITMENTS, type ServiceFact } from './semantic.ts';

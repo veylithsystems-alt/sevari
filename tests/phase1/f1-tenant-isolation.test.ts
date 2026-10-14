@@ -80,11 +80,11 @@ contractSuite('F1', () => {
     const results = await Promise.all(Array.from({ length: 40 }, (_, i) => {
       const s = i % 2 === 0 ? a : b;
       return withTenant(h.db, s, async (tx) => {
-        const rows = await tx.selectFrom('tenants').select('id').execute();
-        return rows.every((r) => r.id === s.tenantId) && rows.length === 1;
+        const rows = await tx.selectFrom('tenants').select(['id', 'region']).execute();
+        return { ok: rows.every((r) => r.id === s.tenantId) && rows.length === 1, expected: s.tenantId, rows };
       });
     }));
-    expect(results.every(Boolean)).toBe(true);
+    expect(results.filter((r) => !r.ok)).toEqual([]);
   });
 
   it('a malformed tenant id is refused before reaching the database', () => {
