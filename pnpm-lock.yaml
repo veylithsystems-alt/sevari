@@ -38,6 +38,9 @@ importers:
       '@sevari/egress':
         specifier: workspace:*
         version: link:packages/egress
+      '@sevari/grounding':
+        specifier: workspace:*
+        version: link:packages/grounding
       '@sevari/intake':
         specifier: workspace:*
         version: link:packages/intake
@@ -235,6 +238,12 @@ importers:
       zod:
         specifier: 3.25.76
         version: 3.25.76
+
+  packages/grounding:
+    dependencies:
+      '@sevari/domain':
+        specifier: workspace:*
+        version: link:../domain
 
   packages/intake:
     dependencies:
