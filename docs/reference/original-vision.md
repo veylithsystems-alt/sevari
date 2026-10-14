@@ -53,6 +53,8 @@ The contract builds Enquiry Mode and the business lifecycle first. The vision's 
 
 ## 5. Where the vision and the contract disagree (contract wins; Dan decides)
 
+**Decided 14 Oct 2026:** Agent Mode is now in the contract (Part K). C-1: silence never approves, but the customer is always auto-acknowledged and every human input is acknowledged and acted on (§74). C-2: disclose AI where required. C-11: the name is **Sevari**. The rest stay open.
+
 | # | Vision says | Contract says | Why it matters |
 |---|---|---|---|
 | C-1 | **Queue-and-notify**: deliver anyway if the owner doesn't respond within 2 hours | INV-14: silence never approves; timeouts go to a declared safe state | A customer could get an unapproved AI reply. The contract's route to the same convenience is an **earned autonomy grant** per action class (§7.2), measured, revocable and opted into |

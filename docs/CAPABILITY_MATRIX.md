@@ -21,4 +21,11 @@ Every capability is **Pilot** (needed for the first pilots), **Launch** (needed 
 | Outbound Tiers C–E | §17 | Deferred | D3 |
 | Voice, WhatsApp, chat widget, marketplace adapters | §36.1 | Deferred | voice excluded from v1 |
 | Region #2 | §1 | Deferred | |
-| HERALD / COMPASS / FORGE | briefs | Q-1 | |
+| Every human input acknowledged and confirmed; customer holding update | §74 | Pilot | |
+| Morning brief / evening summary | §78 | Pilot (morning brief) / Launch (evening) | |
+| Agent Mode framework, SENTINEL | Part K, K1 | Launch | |
+| LEDGER agent | K2 | Launch | over Part B finance |
+| VANGUARD agent | K3 | Launch | Tiers A/B only |
+| HERALD agent | K4 | Launch or Deferred | Dan decides (§80) |
+| COMPASS agent | K5 | Deferred | source register + counsel |
+| FORGE agent | K6 | Deferred | Dan decides (§80) |

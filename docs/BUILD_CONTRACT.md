@@ -1,6 +1,6 @@
 # sevari-core — Build Contract for Claude Code
 
-Version 1.10 · 13 October 2026 (Part J: definition of finished, production readiness, value gate, delivery ambiguity, key management, grounding holdout, processor registry, recovery, legal precision; Part I: Twilio ADR draft answers; Part H: build checklist and Twilio ADR requirements; Part G: capacity and cost-floor model; missed-call text adapter confirmed, Part F; D1 and D3 confirmed; Part D: market, beachhead, trades; Part E: pilot market, pricing and outreach; Appendices 1–2: go-to-market and pilot plans) (Part B: full lifecycle §16–§27; Part C: decisions, human feedback, governed self-learning, platform hardening §28–§40) · Owner: Dan Hadfield (Veylith Systems)
+Version 1.11 · 14 October 2026 (Part K: Agent Mode and acknowledging every human input, binding on Dan's merge; Part J: definition of finished, production readiness, value gate, delivery ambiguity, key management, grounding holdout, processor registry, recovery, legal precision; Part I: Twilio ADR draft answers; Part H: build checklist and Twilio ADR requirements; Part G: capacity and cost-floor model; missed-call text adapter confirmed, Part F; D1 and D3 confirmed; Part D: market, beachhead, trades; Part E: pilot market, pricing and outreach; Appendices 1–2: go-to-market and pilot plans) (Part B: full lifecycle §16–§27; Part C: decisions, human feedback, governed self-learning, platform hardening §28–§40) · Owner: Dan Hadfield (Veylith Systems)
 Status: binding on every pull request. If the code and this contract disagree, the code is wrong or the contract needs to be amended (§14). Nothing in between counts.
 
 ---
@@ -1296,7 +1296,94 @@ An allowed hostname is not a processor record.
 
 ## 73. Changelog
 
+- **v1.11 (14 October 2026, drafted at Dan's request):** Part K added: §74 every human input acknowledged and acted on, customer holding update, silence never approves (F51–F54); Agent Mode (§75–§80) with the seven agents as signed packs, models without tools, new action classes, briefs, plans as data, phases K1–K6 and tests A1–A12. Name: Sevari. Constitutional note: §8.3 tightened only (`code_deploy`, `infra_change` always human).
 - **v1.10 (13 October 2026, Dan):** Part J added: build-complete vs production-approved vs commercially launched; Production Readiness phase; Value Gate; billing split and capability matrix; delivery-ambiguity tests F46–F50; key-management threat model and T-KEY tests; adversarial holdout corpus F3H and the testable replacement for "never wrong on facts"; structured processor registry; SLO/RTO/RPO approval; auditable sign-offs, assess-then-notify breach handling, Article 22 classification per use case. §3 and §8.3 are clarified and tightened, never loosened (constitutional note: §71 keeps the §8.3 Art. 22 reservation intact).
+
+---
+---
+
+# PART K — Agent Mode, and acknowledging every human input (added in v1.11)
+
+Status: **drafted by Claude Code at Dan's request on 14 October 2026; binding when Dan merges it.** Part K overrides Parts A–J wherever they conflict, except §3 and §8.3, which it only tightens. Decisions recorded with it: the product name is **Sevari**; silence never approves; AI-drafted content is disclosed where the tenant's policy or the law requires (§8.4).
+
+## 74. Every human input is acknowledged and acted on
+
+This extends §30 (INV-12 to INV-16) with a rule Dan set: no human input goes unanswered, and silence never approves.
+
+1. **Acknowledge on receipt.** Every human input (approve, reject, edit, answer, instruction, sign-off) gets an immediate acknowledgement on the channel it came from, saying what was understood and what will happen next. For example: "Approved. Sending your reply to the customer now." An input that can't be accepted (stale, wrong role, ambiguous) gets an acknowledgement that says so and what happens instead (§30.4).
+2. **Confirm the effect.** When the effect receipt is written (INV-13), the human is told the outcome: "Sent at 10:02 and delivered." A failed effect is reported the same way, with the next step.
+3. **Nothing is left pending without a clock.** Every open question to a human shows in the owner inbox with its deadline and its declared safe default (§30.3). An unanswered question escalates (§30.6 batching applies); it never resolves itself to "approve".
+4. **The customer is never left in silence.** While an approval is pending, the customer has the deterministic acknowledgement (§5.2). If the approval is still pending at the reply time the tenant has stated, the customer gets one deterministic holding update (an `ack`-class template, no model wording, no commitments). The holding update is a tenant setting, on by default, and is not an approval of anything.
+5. Tests: **F51** every human input produces an acknowledgement on its channel within the ACK target; **F52** every applied input produces an outcome confirmation; a failed effect produces a failure notice; **F53** a pending approval past the stated reply time produces exactly one holding update to the customer and no other send; **F54** no code path turns silence or timeout into approval (extends F24).
+
+## 75. Agent Mode: scope
+
+Sevari has two modes on one engine:
+- **Enquiry Mode** (Parts A–J): inbound enquiries from a tenant's customers.
+- **Agent Mode** (this Part): **tasks** from the tenant (or scheduled) that specialist agents carry out for the tenant's business.
+
+Both modes share intake, threat screening, tenancy, encryption, the autonomy engine, human input, grounding, audit and metrics. Nothing in Agent Mode bypasses any of them. A task is an inbound item of kind `task` with an optional `target_agent`; without one, the router chooses deterministically, falling back to BASTION, and the choice is recorded with its confidence.
+
+## 76. How agents work (reconciling "tool access" with §5.3 and §36.3)
+
+- **The model never holds tools.** An agent's model proposes a structured action (a JSON schema per action type). The deterministic workflow validates it, runs the autonomy policy (§7), and only then calls a **tool adapter**. Tool adapters are channel or integration adapters (§9, §36.1): they declare their egress hosts, data scope and ADR, and live behind the egress allowlist (INV-3).
+- **Each agent is a signed, versioned pack** (§36.1): role, prompts, allowed action classes, tool adapters, schedules, model routing by task type (§9), templates for its fallback, and an eval suite. An agent can only use the action classes in its pack: no agent can do another agent's job.
+- **Every agent has a template floor.** If the model fails, the agent produces its template output or escalates to a human (T5/T6 in the original design). It never improvises.
+- **Agent output is grounded.** Factual claims come from tenant records, the claims register (§43) or cited sources (COMPASS). Ungrounded output is blocked, not edited (§68).
+
+## 77. The seven agents
+
+| Agent | Role | Action classes (new ones marked *) | Gate | Constraints |
+|---|---|---|---|---|
+| **BASTION** | Customer support: the Enquiry Mode engine | existing (§7.2) | as §7.2 | Unchanged |
+| **SENTINEL** | Health of the tenant's Sevari setup and of the cell | `report_internal`* | automatic to the dashboard | Read-only telemetry. Infrastructure changes are `infra_change`* and Dan-only (§8.3) |
+| **LEDGER** | Finance: invoices, chasing, reconciliation, summaries | `invoice_send`, `payment_request`, `refund`, `report_internal`* | always approval for money movement (§19) | Mode 1 only (D1). The model never computes money; it may word a summary of computed figures |
+| **VANGUARD** | Lead follow-up and pipeline | `outreach_send`*, `marketing` | always approval until a grant; Tier C first touch never grantable | Tiers A and B only (D3). Suppression, provenance, quiet hours, frequency caps (§17.2) |
+| **HERALD** | Content: posts, newsletters, case studies, web copy | `content_draft`*, `content_publish`* | `content_publish` always approval | Sources are the tenant's own records and the claims register. No web crawling. Newsletters to people are marketing (PECR consent, §17). Case studies need the subject's written consent |
+| **COMPASS** | Market intelligence | `report_internal`*, `recommendation`* | reports automatic to the dashboard; recommendations are suggestions only | Sources only from a **source register** (terms of use checked, `counsel_signoff` where needed, like §17.1 Tier E). No collection of personal data about individuals. Every finding cites its source and date |
+| **FORGE** | Website and code work for the tenant | `code_change`*, `code_deploy`* | `code_change` = a branch and a pull request, approval to merge; `code_deploy` always approval, never grantable | Only on repositories the tenant connects. Never on Sevari itself. Sandboxed runs, no secrets in prompts, tests must pass. Highest risk: built last, with its own security review |
+
+New action classes (`report_internal`, `recommendation`, `content_draft`, `content_publish`, `outreach_send`, `code_change`, `code_deploy`, `infra_change`) extend §7.2. `code_deploy` and `infra_change` join the reserved list as always-human (§8.3, tightened; constitutional note: tightening only).
+
+## 78. Owner briefs and plans
+
+- **Morning brief (07:00) and evening summary (19:00)**, tenant-local time and configurable: overnight and daily activity, items awaiting the owner (each with its approve/reject link and deadline), outcomes of earlier inputs (§74), health, key metrics and learning proposals. Every line links to the audit events behind it. Briefs are owner-facing service messages, not marketing.
+- **Plans and entitlements as data** (§47): which agents and limits a plan includes. Features above a tenant's plan are visible, described and labelled with the plan that unlocks them, and inaccessible. No dark patterns.
+- Over a plan's allowance, Enquiry Mode never stops acknowledging customers (§5.2). What else continues is plan data, decided by Dan.
+
+## 79. Agent Mode phases (each starts with its tests red)
+
+Agent Mode starts after Phase 18 and Phase 6 (human input and approvals) are green, because every agent depends on them.
+
+| Phase | Scope | Exit |
+|---|---|---|
+| K1 | Task intake and router, agent pack framework, structured action proposals, template floor, briefs, SENTINEL | A1–A6 green |
+| K2 | LEDGER as an agent over Part B finance (Phases 12–13) | A7 green, F14–F18 still green |
+| K3 | VANGUARD over Part B sourcing (Phase 10) | A8 green, F9–F13 still green |
+| K4 | HERALD with publishing adapters (each with an ADR) | A9 green |
+| K5 | COMPASS with the source register (counsel sign-off per source type) | A10 green |
+| K6 | FORGE with a sandbox and a repository adapter (ADR, security review) | A11–A12 green |
+
+Tests:
+- **A1** a model output can never call a tool adapter directly; only a validated, policy-approved action can.
+- **A2** an agent can't use an action class outside its pack.
+- **A3** a task goes through threat screening, grounding and autonomy exactly like an enquiry; there is no task bypass.
+- **A4** when the model fails, the agent uses its template floor or escalates.
+- **A5** every brief line links to existing audit events; a brief never includes another tenant's data.
+- **A6** the router's choice is deterministic for the same input and is recorded with its confidence.
+- **A7** LEDGER can't move money or send a payment request without approval.
+- **A8** VANGUARD can't contact anyone outside Tiers A/B or suppression rules.
+- **A9** HERALD can't publish without approval, or publish a claim missing from the claims register.
+- **A10** COMPASS can't read from a source that isn't on the source register, and its reports carry no personal data about individuals.
+- **A11** FORGE can't push to a default branch or deploy without approval.
+- **A12** secrets never appear in a FORGE prompt or log.
+
+## 80. Open decisions added by Part K (owner: Dan)
+
+1. HERALD's publishing channels (for example LinkedIn, X, a website CMS): each needs a provider ADR.
+2. COMPASS's first source types (for example Companies House, public tenders, industry news feeds).
+3. FORGE: in scope for the first commercial release, or later?
+4. Which plan includes which agents (prices are data, §47; three price lists exist, Q-2).
 
 ---
 ---

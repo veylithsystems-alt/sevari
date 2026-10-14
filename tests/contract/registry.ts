@@ -5,7 +5,7 @@
  */
 export type Phase =
   | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '9b' | '10' | '11' | '12' | '13' | '14' | '15'
-  | '18' | '20' | '21' | '22' | '23' | '24' | '25';
+  | '18' | '20' | '21' | '22' | '23' | '24' | '25' | 'K1' | 'K2' | 'K3' | 'K4' | 'K5' | 'K6';
 
 export interface ContractTest {
   readonly id: string;
@@ -100,6 +100,23 @@ export const CONTRACT_TESTS: readonly ContractTest[] = [
   t('T-PROC', '2', '§69', 'Every allowlisted host maps to an approved processor; register generated from the registry'),
   t('T-SLO', '8', '§70', 'Cell refuses live tenants until SLO/RTO/RPO are approved; ACK measured with slow provider'),
   t('T-SIGNOFF', '18', '§71', 'Sign-offs are auditable human approval records, verified at boot'),
+  // Part K (v1.11)
+  t('F51', '18', '§74', 'Every human input is acknowledged on its channel within the ACK target'),
+  t('F52', '18', '§74', 'Every applied input gets an outcome confirmation; a failed effect gets a failure notice'),
+  t('F53', '18', '§74', 'Pending approval past the stated reply time: exactly one deterministic holding update'),
+  t('F54', '18', '§74', 'No code path turns silence or timeout into approval'),
+  t('A1', 'K1', '§79', 'A model output can never call a tool adapter directly'),
+  t('A2', 'K1', '§79', 'An agent cannot use an action class outside its pack'),
+  t('A3', 'K1', '§79', 'Tasks go through screening, grounding and autonomy exactly like enquiries'),
+  t('A4', 'K1', '§79', 'Model failure falls to the agent template floor or escalation'),
+  t('A5', 'K1', '§79', 'Every brief line links to existing audit events; no cross-tenant data'),
+  t('A6', 'K1', '§79', 'Router choice is deterministic and recorded with confidence'),
+  t('A7', 'K2', '§79', 'LEDGER cannot move money or request payment without approval'),
+  t('A8', 'K3', '§79', 'VANGUARD cannot contact outside Tiers A/B or suppression rules'),
+  t('A9', 'K4', '§79', 'HERALD cannot publish without approval or publish an unregistered claim'),
+  t('A10', 'K5', '§79', 'COMPASS reads only registered sources; reports carry no personal data'),
+  t('A11', 'K6', '§79', 'FORGE cannot push to a default branch or deploy without approval'),
+  t('A12', 'K6', '§79', 'Secrets never appear in a FORGE prompt or log'),
 ];
 
 /** T1–T23 come from the v3.6 resurrection review, which has not been supplied yet (see docs/reference/t-mapping.md). */
