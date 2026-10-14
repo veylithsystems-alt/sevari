@@ -73,3 +73,40 @@ The contract builds Enquiry Mode and the business lifecycle first. The vision's 
 ## 6. One correction to the vision's legal text
 
 The brief says "UK adequacy decision provides data flow to EU". Data protection adequacy runs the other way: the EU's adequacy decision for the UK lets **EU→UK** transfers flow, and UK rules separately permit **UK→EEA** transfers. Counsel should confirm the current position before any document states it. This is an example of why §43's claims register exists.
+
+## 7. Second review (14 Oct 2026): Product Brief, Design Brief v2.2 and Synchronicity v1.0 against contract v1.11
+
+Dan asked: are the vision and the contract aligned, can the vision come true, and what could still improve?
+
+### 7.1 Verdict
+- **The heart is aligned.** Every promise that makes Sevari different is in the contract and most are already built and tested: every enquiry gets an answer even if the AI is down (deterministic ACK, templates, human), nothing consequential goes out without approval, a tamper-evident record, private local AI with no cloud AI, each business sealed off from the others and encrypted with its own key, money always needs a human, honest "I don't know" instead of guessing, export and erasure, and learning that only changes things with approval.
+- **The contract is stricter than the vision in a handful of places**, on purpose (C-1 to C-12 above, and C-13 to C-20 below). In each case the vision's *promise* survives; what changes is the mechanism or the wording, so that it is true, lawful and provable.
+- **The vision is achievable, in order.** Enquiry Mode for small UK service businesses on private CPU inference is technically realistic and is what Phases 0–8 deliver. The parts that are hard are commercial (getting pilots, proving owners save time and money, keeping support load manageable for a one-person company), not technical. Agent Mode is achievable as plug-in packs (Part K) once approvals exist; FORGE (code agent) is the one piece that can't be market-leading on a 7B model on a CPU.
+
+### 7.2 New differences found in this review
+
+| # | Vision says | Contract says | Why it matters / recommendation |
+|---|---|---|---|
+| C-13 | Self-serve: "ten questions, ten minutes, first enquiry handled in under an hour, no setup calls" | §18: owner-confirmed knowledge, shadow mode, and **activation is a human decision** (§8.3); T-ONB-1 and T-ONB-3 | Both can hold: the owner's own "go live" tap after an automatic checklist is the human approval for **Assist mode** (every reply waits for their tap; the customer ACK is deterministic). Shadow mode becomes a recommended option, not a wait. Dan's approval stays for regulated trades and anything beyond Assist. **Question Q-15** |
+| C-14 | For anyone: mobile hairdresser, childminder, IT support engineer, garden clearance, the kitchen-table founder | Part D beachhead: five unregulated trades (drainage, roofing, locksmiths, garage doors, landscaping) | Not a conflict: packs are data, so new audiences are new packs. Childminding involves children's data and Ofsted registration, so it would be `regulated: true` and needs counsel. **Question Q-16** |
+| C-15 | If the owner doesn't respond, the request escalates to a **delegate** they trust, and the reply still gets sent | Silence never approves (INV-14, §74). No delegate concept | Delegates fit the contract if the delegate **actively approves** (never a timeout approval): owner names people and what they may approve; unanswered requests move to them after a delay the owner sets; everything is acknowledged (§74). Money stays owner-only unless the owner grants it explicitly. **Question Q-17** |
+| C-16 | Several promises are worded as absolutes | §43 claims register: no claim without evidence | Reword before any public page (table 7.3). This protects Dan legally and is still a strong pitch |
+| C-17 | Approvals by SMS ("one tap on your phone") | §7.1 approvals; §36.1 owner app (PWA) | Approval texts cost money on every enquiry (Part G). Recommendation: approvals in the owner app with free push notifications first, SMS only as a fallback when push isn't answered or the owner prefers it. Same one-tap experience, lower cost. Proposal R-21 |
+| C-18 | "Talk to Sevari herself on the website" | Not stated; `tenants.is_house` exists | Veylith as **tenant zero**: Sevari answers Veylith's own sales enquiries through the same pipeline, with the same rules. The best possible demo, and it finds problems before customers do. Proposal R-22 |
+| C-19 | HERALD phases switched by running SQL by hand (`UPDATE marketing_phase …`) | Part K: agents are signed packs; changes are data with approval records | Becomes a setting in the owner/operator console with an approval record. No hand-written SQL in production (already how the build works) |
+| C-20 | FORGE (code agent) in the Enterprise plan | Part K6 | A 7B model on a CPU can't compete with dedicated coding tools, and code deployment is a very different risk. **Question Q-18** |
+
+### 7.3 Promises that need rewording (for the claims register, §43)
+
+| Brief says | Problem | True and still strong |
+|---|---|---|
+| "Encrypted with a key only your business has" | The key is unique to the business but held by Sevari's key service, so Veylith's systems can use it | "Encrypted with your business's own key. Delete your account and that key is destroyed, so the data can never be read again." |
+| "Logged permanently… prove what was said indefinitely, verbatim" | Message content is personal data and can't be kept forever; customers can ask for erasure | "Every decision is recorded in a tamper-evident log. Message content is kept for [period counsel confirms], and the record of what happened is kept for as long as the law allows." |
+| "Can't be told to skip the rules… not by us" | Veylith writes the code and could change it | "The rules are built into the system and tested on every change. No setting, customer message or AI suggestion can switch them off, and any change to them is a recorded, reviewed decision." |
+| "Cannot fail" / "That's a guarantee" (T5 templates) | Nothing on a server is impossible to fail; a guarantee creates legal liability | "Every enquiry gets a reply even if the AI is down. Replies don't depend on the AI." Publish measured uptime instead |
+| "Same input, same output. Proven." | True for the rules engine; model wording can vary slightly | "Decisions are made by fixed rules: the same message gets the same decision, and we can replay any past reply." |
+| "No cloud AI. Ever." alongside the desktop GPU over Cloudflare Tunnel | The tunnel makes Cloudflare a processor of customer content (Q-3) | Keep the promise; drop or rework the tunnel (Q-3) |
+| "All prices include VAT" | Only true if Veylith is VAT-registered; below the threshold no VAT can be charged | Show prices "VAT included where applicable" until registration is confirmed (counsel/accountant) |
+| "Incorporation triggered by the first Stripe payment" | The contracting party, DPA, ICO fee and Twilio bundle all depend on the entity, and must be settled before the first customer's data is processed | Decide the entity before the first pilot (Q-4) |
+| "Digital content activation waiver" refund policy | Most customers are businesses, not consumers, so consumer cancellation rules may not apply; sole traders acting for their business usually aren't consumers | Counsel drafts the terms (PR-8) |
+| "GDPR, CCPA, PIPEDA, LGPD covered" | Unverified (C-8) | Name only what counsel has confirmed |

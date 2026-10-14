@@ -56,6 +56,14 @@ Legend: **R** = recommendation, **Q** = needs Dan's decision (see `docs/QUESTION
 
 **R-20. Companies House pre-fill at onboarding.** From the vision's EKP enrichment: the owner enters a company number and the system drafts knowledge records (registered name, address, SIC codes) **for the owner to confirm** (§18). This automates a real chore lawfully, using a public register about the tenant's own business. *Change:* add to §18; it needs a provider ADR (Companies House API) and an allowlist entry.
 
+**R-21. Approvals in the owner app first, SMS as fallback.** The briefs promise "one tap on your phone". An SMS per approval costs money on every enquiry (Part G). The owner app (PWA, §36.1) with web push gives the same one tap for free. *Change:* in §7.1 and Phase 6, approvals are delivered by push first and by SMS only if push isn't acknowledged within the owner's chosen delay or the owner prefers SMS. SMS replies (`APPROVE <code>`) stay valid for low-risk classes only, single-use and sender-checked (vision §4).
+
+**R-22. Veylith as tenant zero.** The Product Brief's "talk to Sevari herself on the website" becomes a rule: Veylith's own enquiries run through Sevari as the house tenant (`is_house`), under the same rules, approvals and audit as every customer. It is the live demo, the first source of real (Veylith-owned) traffic, and an early warning system. *Change:* add to Part E and Phase 11.
+
+**R-23. Delegates (from the Product Brief).** An owner can name delegates and the action classes each may approve. Unanswered approvals move to the next delegate after a delay the owner sets; a delegate must actively approve (INV-14, §74 unchanged); every hand-over is acknowledged to the owner. Money classes stay owner-only unless the owner grants them explicitly. *Change:* add to §7.1 and §74 (pending Q-17).
+
+**R-24. Claims wording from the briefs.** Ten absolute statements in the briefs need rewording before any public page (`docs/reference/original-vision.md` §7.3). *Change:* seed the §43 claims register with them, each with its evidence or its "do not publish until counsel confirms" status.
+
 ## 4. Product and law: items that need a decision, not code
 
 **Q-1. The seven agents (BASTION, SENTINEL, HERALD, VANGUARD, COMPASS, LEDGER, FORGE).** The briefs sell seven named agents. The contract never mentions them. My mapping:
