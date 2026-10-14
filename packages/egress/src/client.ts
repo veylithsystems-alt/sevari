@@ -9,6 +9,7 @@
  */
 import { request as httpsRequest } from 'node:https';
 import { request as httpRequest, type IncomingHttpHeaders } from 'node:http';
+import type { Socket } from 'node:net';
 import { ContractViolation } from '@sevari/domain';
 import { isAllowed, type EgressPolicy } from './allowlist.ts';
 
@@ -89,7 +90,7 @@ const nodeTransport: Transport = (req, proxy) =>
   new Promise((resolve, reject) => {
     const timeoutMs = req.timeoutMs ?? 15_000;
     const maxBytes = req.maxResponseBytes ?? 5 * 1024 * 1024;
-    const issue = (socket?: import('node:net').Socket) => {
+    const issue = (socket?: Socket) => {
       const r = httpsRequest({
         host: req.host, port: req.port, path: req.path, method: req.method ?? 'GET', headers: req.headers,
         servername: req.host, timeout: timeoutMs, ...(socket ? { socket, agent: false } : {}),

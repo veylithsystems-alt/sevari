@@ -38,8 +38,8 @@ export function createEgressProxy(opts: ProxyOptions): Server {
       clientSocket.end(`HTTP/1.1 ${code} Forbidden\r\n\r\n`);
     };
     const m = /^([a-z0-9.-]+):(\d{1,5})$/i.exec(req.url ?? '');
-    if (!m) return deny(400, req.url ?? '', 0, 'malformed CONNECT target');
-    const host = m[1]!.toLowerCase();
+    if (!m || !m[1]) return deny(400, req.url ?? '', 0, 'malformed CONNECT target');
+    const host = m[1].toLowerCase();
     const port = Number(m[2]);
     const entry = hostsForCell(opts.policy, opts.region).find((e) => e.host === host && e.port === port);
     if (!entry) return deny(403, host, port, 'not on the cell allowlist');
