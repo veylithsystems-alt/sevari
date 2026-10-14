@@ -12,4 +12,5 @@ paths = [
 regexes = [
   '''owner_test_only''',
   '''app_test_only''',
+  '''worker_test_only''',
 ]

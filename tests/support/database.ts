@@ -11,6 +11,8 @@ export interface TestDatabaseInfo {
   readonly ownerUrl?: string;
   /** Application role: NOBYPASSRLS, not the owner. Every isolation test runs as this. */
   readonly appUrl?: string;
+  /** Queue-claiming role (sevari_worker). */
+  readonly workerUrl?: string;
   readonly database?: string;
   /** Superuser connection to the server's maintenance database, for creating isolated databases. */
   readonly serverUrl?: string;
@@ -22,7 +24,7 @@ export interface TestDatabase {
 }
 
 // Test-only credentials for throwaway databases. Never used outside tests (see .gitleaks.toml allowlist).
-export const TEST_PASSWORDS = { owner: 'owner_test_only', app: 'app_test_only' } as const;
+export const TEST_PASSWORDS = { owner: 'owner_test_only', app: 'app_test_only', worker: 'worker_test_only' } as const;
 
 function withDb(url: string, database: string, user?: string, password?: string): string {
   const u = new URL(url);
@@ -42,11 +44,12 @@ export async function prepare(adminUrl: string): Promise<TestDatabaseInfo> {
     await admin.end();
   }
   const superUrl = withDb(adminUrl, database);
-  await bootstrapCluster({ superUrl, database, ownerPassword: TEST_PASSWORDS.owner, appPassword: TEST_PASSWORDS.app });
+  await bootstrapCluster({ superUrl, database, ownerPassword: TEST_PASSWORDS.owner, appPassword: TEST_PASSWORDS.app, workerPassword: TEST_PASSWORDS.worker });
   const ownerUrl = withDb(adminUrl, database, 'sevari_owner', TEST_PASSWORDS.owner);
   const appUrl = withDb(adminUrl, database, 'sevari_app', TEST_PASSWORDS.app);
+  const workerUrl = withDb(adminUrl, database, 'sevari_worker', TEST_PASSWORDS.worker);
   await runMigrations({ ownerUrl });
-  return { available: true, superUrl, ownerUrl, appUrl, database, serverUrl: adminUrl };
+  return { available: true, superUrl, ownerUrl, appUrl, workerUrl, database, serverUrl: adminUrl };
 }
 
 export async function startTestDatabase(): Promise<TestDatabase> {

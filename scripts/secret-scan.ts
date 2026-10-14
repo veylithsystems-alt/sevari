@@ -15,7 +15,7 @@ export const PATTERNS: ReadonlyArray<[string, RegExp]> = [
   ['GitHub token', /\bgh[pousr]_[A-Za-z0-9]{36,}\b/],
   ['Slack token', /\bxox[baprs]-[A-Za-z0-9-]{10,}\b/],
   ['Google API key', /\bAIza[0-9A-Za-z_-]{35}\b/],
-  ['generic password URL', /postgres(ql)?:\/\/[^:\s/]+:(?!owner_test_only|app_test_only|postgres@|ci_only_password@|\$\{)[^@\s]{6,}@/],
+  ['generic password URL', /postgres(ql)?:\/\/[^:\s/]+:(?!owner_test_only|app_test_only|worker_test_only|postgres@|ci_only_password@|\$\{)[^@\s]{6,}@/],
 ];
 
 export function scanText(text: string): string[] {

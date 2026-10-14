@@ -18,7 +18,7 @@ describe('[INV-7] every tenant-scoped table has tenant_id, region, RLS forced (s
   it('flags a table missing tenancy columns or RLS', () => {
     const problems = lintSchema([{ table: 'naughty', rlsEnabled: false, rlsForced: false, policyCount: 0, owner: 'sevari_app', columns: [] }]);
     expect(problems).toEqual(expect.arrayContaining([
-      'naughty: RLS not enabled', 'naughty: RLS not forced', 'naughty: no RLS policy', 'naughty: owned by the app role',
+      'naughty: RLS not enabled', 'naughty: RLS not forced', 'naughty: no RLS policy', 'naughty: owned by a runtime role',
       'naughty: missing NOT NULL tenant_id (INV-7)', 'naughty: missing NOT NULL region region_code (INV-7)',
     ]));
   });

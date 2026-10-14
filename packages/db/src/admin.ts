@@ -44,6 +44,7 @@ export interface BootstrapOptions {
   readonly database: string;
   readonly ownerPassword: string;
   readonly appPassword: string;
+  readonly workerPassword: string;
 }
 
 /** Creates the owner and app roles and hands the schema to the owner. Idempotent. */
@@ -54,6 +55,8 @@ export async function bootstrapCluster(opts: BootstrapOptions): Promise<void> {
     await client.query(await readFile(BOOTSTRAP_SQL, 'utf8'));
     await client.query(`ALTER ROLE sevari_owner PASSWORD ${quoteLiteral(opts.ownerPassword)}`);
     await client.query(`ALTER ROLE sevari_app PASSWORD ${quoteLiteral(opts.appPassword)}`);
+    await client.query(`ALTER ROLE sevari_worker PASSWORD ${quoteLiteral(opts.workerPassword)}`);
+    await client.query(`GRANT CONNECT ON DATABASE ${quoteIdent(opts.database)} TO sevari_worker`);
     await client.query(`GRANT CONNECT, TEMPORARY ON DATABASE ${quoteIdent(opts.database)} TO sevari_app`);
     await client.query(`GRANT CONNECT, CREATE ON DATABASE ${quoteIdent(opts.database)} TO sevari_owner`);
   } finally {

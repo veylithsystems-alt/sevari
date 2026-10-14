@@ -45,7 +45,7 @@ export function lintSchema(tables: readonly TableSecurity[]): string[] {
     if (!t.rlsEnabled) problems.push(`${t.table}: RLS not enabled`);
     if (!t.rlsForced) problems.push(`${t.table}: RLS not forced`);
     if (t.policyCount === 0) problems.push(`${t.table}: no RLS policy`);
-    if (t.owner === 'sevari_app') problems.push(`${t.table}: owned by the app role`);
+    if (t.owner === 'sevari_app' || t.owner === 'sevari_worker') problems.push(`${t.table}: owned by a runtime role`);
     const versionCol = t.table === 'schema_migrations' ? 'version_no' : 'version';
     for (const required of ['created_at', 'updated_at', versionCol]) {
       if (!col(required)?.notNull) problems.push(`${t.table}: missing NOT NULL ${required}`);

@@ -67,8 +67,14 @@ export const ERASURE_REGISTRY: Readonly<Record<string, TableEntry>> = {
   conversations: { purpose: 'threading', lawfulBasis: 'as the contact', category: 'contact', retention: H(730, 'relationship_end'), erasure: 'delete', columns: {} },
   messages: {
     purpose: 'enquiry content', lawfulBasis: 'as the contact', category: 'contact', retention: H(730, 'relationship_end'), erasure: 'delete',
-    columns: { body_enc: enc(), body_digest: { category: 'contact', erasure: 'delete', dsar: false } },
+    columns: {
+      body_enc: enc(), body_digest: { category: 'contact', erasure: 'delete', dsar: false },
+      subject_enc: enc(), raw_enc: { category: 'contact', erasure: 'delete', dsar: true, note: 'raw inbound payload as received (§5.2)' },
+    },
   },
+  channel_endpoints: { purpose: 'routing inbound channels to a tenant', lawfulBasis: 'contract', category: 'none', retention: H(null, 'tenant_exit'), erasure: 'delete', columns: {} },
+  api_keys: { purpose: 'tenant API authentication', lawfulBasis: 'contract / security', category: 'none', retention: H(null, 'tenant_exit'), erasure: 'delete', columns: {} },
+  job_queue: { purpose: 'durable work queue (ids only)', lawfulBasis: 'as the underlying record', category: 'none', retention: H(30, 'created'), erasure: 'delete', columns: {} },
 };
 
 /** Columns tagged '@pii' in the schema but missing from the registry. Empty = INV-6 holds. */

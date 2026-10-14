@@ -96,6 +96,48 @@ export interface MessagesTable extends Meta {
   body_enc: Buffer;
   body_digest: Buffer;
   received_at: Date | string;
+  kind: Generated<'enquiry' | 'task'>;
+  subject_enc: Buffer | null;
+  raw_enc: Buffer | null;
+  endpoint_id: string | null;
+}
+export interface ChannelEndpointsTable extends Meta {
+  id: Generated<string>;
+  tenant_id: string;
+  region: string;
+  channel: 'webform' | 'email' | 'sms' | 'api' | 'telephony';
+  public_id: string;
+  secret_enc: Buffer | null;
+  lawful_basis: string;
+  purpose: string;
+  allowed_origins: Generated<string[]>;
+  status: Generated<'active' | 'disabled'>;
+}
+export interface ApiKeysTable extends Meta {
+  id: Generated<string>;
+  tenant_id: string;
+  region: string;
+  prefix: string;
+  key_hash: Buffer;
+  scopes: string[];
+  status: Generated<'active' | 'revoked'>;
+  expires_at: Date | null;
+  last_used_at: Date | null;
+}
+export interface JobQueueTable extends Meta {
+  id: Generated<string>;
+  tenant_id: string;
+  region: string;
+  kind: string;
+  dedupe_key: string;
+  payload: ColumnType<unknown, string | undefined, string>;
+  state: Generated<'queued' | 'running' | 'done' | 'failed' | 'dead'>;
+  run_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  attempts: Generated<number>;
+  max_attempts: Generated<number>;
+  locked_by: string | null;
+  locked_until: Date | null;
+  last_error: string | null;
 }
 
 export interface Database {
@@ -108,4 +150,7 @@ export interface Database {
   contacts: ContactsTable;
   conversations: ConversationsTable;
   messages: MessagesTable;
+  channel_endpoints: ChannelEndpointsTable;
+  api_keys: ApiKeysTable;
+  job_queue: JobQueueTable;
 }
