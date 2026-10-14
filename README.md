@@ -17,8 +17,8 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 | 0 | Project skeleton, automatic checks, every contract test written | ✅ Done |
 | 1 | The secure database: businesses can never see each other's data, data stays in its region, the tamper-proof record, encryption | ✅ Done |
 | 2 | Receiving enquiries (web form, email, SMS, API), the outbound-connection guard and firewall, the supplier register | ✅ Done |
-| 3 | The rules engine: what the customer wants, prices, areas, availability, bookings | Next |
-| 4 | The instant acknowledgement, and the fact-checker that stops made-up prices or dates | Planned |
+| 3 | The rules engine: what the customer wants, prices, areas, availability, bookings | ✅ Done |
+| 4 | The instant acknowledgement, and the fact-checker that stops made-up prices or dates | Next |
 | 5 | The local AI models and how they're scored | Planned |
 | 18 → 6 | Your approvals: questions to you, one-tap approve, nothing sends without it | Planned |
 | 7 | Privacy: erasure, data requests, retention, the consent record | Planned |
@@ -33,6 +33,8 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 - Personal details are encrypted with each business's own key. Destroying that key makes the data unreadable for good.
 - The app refuses to start if any safety check fails.
 - Enquiries arrive from website forms, email, SMS and the API. Each one is checked for a valid signature, stored encrypted, and queued in a single step. Sending the same message twice never creates a duplicate.
+- The rules engine reads each enquiry and works out the job, the postcode area, how urgent it is, whether you cover it, and what your price and availability records say. It never invents a price: if your records don't say, it marks the question as unknown for you. On 100 test enquiries across your five trades, it routes 94% correctly. It caught **every** danger-to-life case and **every** complaint, legal threat or data request. When it's unsure, it asks the customer a question rather than guessing, and after two tries it hands over to you.
+- Your business facts (prices, hours, areas, services) only count once you've confirmed them. Every change keeps its history, so any past reply can be checked against exactly what was true at the time.
 - Sevari can't connect to any outside service unless you've approved that supplier. This is enforced three ways: in the code, by a gatekeeper process, and by the server's firewall (proven by a test). The supplier list (processor register) is generated automatically and currently says: no suppliers approved yet.
 
 **Things I found that you should know:**
@@ -65,6 +67,10 @@ packages/
   boot/               boot guard (INV-9)
   channels/           channel adapters: web form, signed webhook (email, API), SMS (fake provider until the Twilio ADR)
   intake/             receive → authenticate → persist encrypted → queue, in one transaction; endpoints and API keys
+  knowledge/          owner-confirmed, versioned knowledge records; point-in-time snapshots (replay)
+  verticals/          the five trade packs (data, not code)
+apps/worker/          queue runner; inbound.process = the deterministic core per message
+eval/                 100-case labelled corpus, knowledge fixtures, runner, reports, accepted baseline
 apps/api/             Fastify server: /v1/inbound/:channel/:publicId, health, CORS for forms, rate limits
 ops/nftables/         default-deny outbound firewall + a namespace test that proves it
 config/
@@ -100,6 +106,7 @@ export SEVARI_TEST_DATABASE_URL=$(pnpm -s db:local)   # starts a local Postgres 
 pnpm test:gate        # what CI enforces: every test of every delivered phase must pass
 pnpm test:all         # everything, including red tests for phases not built yet
 pnpm contract:status  # table of contract tests: implemented? phase delivered?
+pnpm eval             # corpus evaluation → eval/reports/<date>.md (--check fails on a >2 point drop)
 ```
 
 ### CI (`.github/workflows/ci.yml`)
@@ -108,7 +115,7 @@ pnpm contract:status  # table of contract tests: implemented? phase delivered?
 - `contract-progress`: every contract test, red included, plus the status table. Informational.
 
 ### Contract test status
-Run `pnpm contract:status` for the live table. After Phase 2: F1 (database and API), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
+Run `pnpm contract:status` for the live table. After Phase 3: F1 (database and API), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
 
 ### Documents
 - [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md): the binding contract (v1.9)

@@ -41,6 +41,9 @@ importers:
       '@sevari/intake':
         specifier: workspace:*
         version: link:packages/intake
+      '@sevari/knowledge':
+        specifier: workspace:*
+        version: link:packages/knowledge
       '@sevari/privacy':
         specifier: workspace:*
         version: link:packages/privacy
@@ -50,6 +53,9 @@ importers:
       '@sevari/verticals':
         specifier: workspace:*
         version: link:packages/verticals
+      '@sevari/worker':
+        specifier: workspace:*
+        version: link:apps/worker
       '@testcontainers/postgresql':
         specifier: 11.7.2
         version: 11.7.2
@@ -119,6 +125,33 @@ importers:
       zod:
         specifier: 3.25.76
         version: 3.25.76
+
+  apps/worker:
+    dependencies:
+      '@sevari/audit':
+        specifier: workspace:*
+        version: link:../../packages/audit
+      '@sevari/clock':
+        specifier: workspace:*
+        version: link:../../packages/clock
+      '@sevari/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
+      '@sevari/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@sevari/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@sevari/intake':
+        specifier: workspace:*
+        version: link:../../packages/intake
+      '@sevari/knowledge':
+        specifier: workspace:*
+        version: link:../../packages/knowledge
+      '@sevari/verticals':
+        specifier: workspace:*
+        version: link:../../packages/verticals
 
   packages/audit:
     dependencies:
@@ -226,6 +259,24 @@ importers:
       '@sevari/region':
         specifier: workspace:*
         version: link:../region
+
+  packages/knowledge:
+    dependencies:
+      '@sevari/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@sevari/clock':
+        specifier: workspace:*
+        version: link:../clock
+      '@sevari/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@sevari/db':
+        specifier: workspace:*
+        version: link:../db
+      '@sevari/domain':
+        specifier: workspace:*
+        version: link:../domain
 
   packages/privacy:
     dependencies:

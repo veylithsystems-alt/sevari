@@ -74,6 +74,14 @@ export const ERASURE_REGISTRY: Readonly<Record<string, TableEntry>> = {
   },
   channel_endpoints: { purpose: 'routing inbound channels to a tenant', lawfulBasis: 'contract', category: 'none', retention: H(null, 'tenant_exit'), erasure: 'delete', columns: {} },
   api_keys: { purpose: 'tenant API authentication', lawfulBasis: 'contract / security', category: 'none', retention: H(null, 'tenant_exit'), erasure: 'delete', columns: {} },
+  knowledge_records: { purpose: 'owner-confirmed business facts (I5)', lawfulBasis: 'contract', category: 'contact', retention: H(null, 'tenant_exit'), erasure: 'crypto-shred', columns: {} },
+  enquiries: {
+    purpose: 'deterministic analysis of each enquiry (§5.2, §10.2)', lawfulBasis: 'as the contact', category: 'contact', retention: H(730, 'relationship_end'), erasure: 'delete',
+    columns: {
+      analysis_enc: enc(),
+      flags: { category: 'special', erasure: 'delete', dsar: true, note: 'routing signals for a human; never an inference about the person' },
+    },
+  },
   job_queue: { purpose: 'durable work queue (ids only)', lawfulBasis: 'as the underlying record', category: 'none', retention: H(30, 'created'), erasure: 'delete', columns: {} },
 };
 

@@ -10,3 +10,4 @@ coverage/
 eval/reports/*.tmp.md
 .stryker-tmp/
 reports/
+eval/reports/ci.md

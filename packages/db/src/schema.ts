@@ -140,6 +140,46 @@ export interface JobQueueTable extends Meta {
   last_error: string | null;
 }
 
+export interface KnowledgeRecordsTable extends Meta {
+  id: Generated<string>;
+  tenant_id: string;
+  region: string;
+  record_key: string;
+  kind: 'service' | 'price' | 'hours' | 'area' | 'policy' | 'faq' | 'business';
+  record_version: number;
+  body_enc: Buffer;
+  status: Generated<'draft' | 'confirmed' | 'retired' | 'rejected'>;
+  source: 'onboarding_interview' | 'owner_edit' | 'import' | 'register_prefill' | 'system_default';
+  proposed_by: string;
+  confirmed_by: string | null;
+  confirmed_at: Date | null;
+  effective_from: Date | null;
+  effective_to: Date | null;
+}
+export interface EnquiriesTable extends Meta {
+  id: Generated<string>;
+  tenant_id: string;
+  region: string;
+  message_id: string;
+  conversation_id: string;
+  pack_id: string;
+  pack_version: string;
+  core_version: string;
+  intent: string;
+  intent_confidence: ColumnType<string, number, never>;
+  intent_source: 'rules' | 'model';
+  abstained: boolean;
+  route: 'safety_first' | 'human_only' | 'opt_out' | 'clarify' | 'unknown' | 'answer';
+  services: string[];
+  flags: string[];
+  urgency: string;
+  eligibility: 'yes' | 'no' | 'unknown';
+  facts_used: string[];
+  facts_missing: string[];
+  analysis_enc: Buffer;
+  analysed_at: Date;
+}
+
 export interface Database {
   regions: RegionsTable;
   tenants: TenantsTable;
@@ -153,4 +193,6 @@ export interface Database {
   channel_endpoints: ChannelEndpointsTable;
   api_keys: ApiKeysTable;
   job_queue: JobQueueTable;
+  knowledge_records: KnowledgeRecordsTable;
+  enquiries: EnquiriesTable;
 }
