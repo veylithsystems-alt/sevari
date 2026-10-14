@@ -1,6 +1,6 @@
-# Egress allowlist (INV-3, §12, §29, §60.1). Default deny.
-# A host appears here only after Dan approves its provider ADR (docs/adr/providers/).
-# The processor register (docs/PROCESSOR_REGISTER.md) is generated from this file.
+# Egress allowlist (INV-3, §12, §29, §60.1, §69). Default deny.
+# Each entry names a processor id from config/processors.yaml; the host is allowed only while that
+# processor is approved. A host appears here only after Dan approves its provider ADR.
 version: 1
 default: deny
 cells:

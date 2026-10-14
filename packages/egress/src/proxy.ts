@@ -4,7 +4,7 @@
  *
  * Only HTTP CONNECT to an allowlisted host:port is accepted; TLS stays end-to-end (the proxy never
  * sees content). The destination is resolved here and private/loopback addresses are refused unless
- * the allowlist entry's role is 'self' (in-cell infrastructure), which blocks DNS-rebinding tricks.
+ * the allowlist entry is marked private_network (in-cell infrastructure), which blocks DNS-rebinding tricks.
  */
 import { createServer, type Server } from 'node:http';
 import { connect as netConnect, isIP } from 'node:net';
@@ -44,7 +44,7 @@ export function createEgressProxy(opts: ProxyOptions): Server {
     const entry = hostsForCell(opts.policy, opts.region).find((e) => e.host === host && e.port === port);
     if (!entry) return deny(403, host, port, 'not on the cell allowlist');
     resolve(host).then((address) => {
-      if (isPrivateAddress(address) && entry.role !== 'self') return deny(403, host, port, `resolves to private address ${address}`);
+      if (isPrivateAddress(address) && !entry.private_network) return deny(403, host, port, `resolves to private address ${address}`);
       const upstream = netConnect(port, address, () => {
         opts.onDecision?.({ host, port, allowed: true, address });
         clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');

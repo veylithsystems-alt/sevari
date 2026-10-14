@@ -89,6 +89,9 @@ importers:
 
   packages/boot:
     dependencies:
+      '@sevari/clock':
+        specifier: workspace:*
+        version: link:../clock
       '@sevari/crypto':
         specifier: workspace:*
         version: link:../crypto

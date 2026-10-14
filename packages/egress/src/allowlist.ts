@@ -7,16 +7,11 @@ const Hostname = z.string().regex(/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-
 export const EgressHostSchema = z.object({
   host: Hostname,
   port: z.number().int().min(1).max(65535).default(443),
-  processor: z.string().min(1),
-  /** 'self' for in-cell infrastructure Veylith runs itself (e.g. the inference box). */
-  role: z.enum(['processor', 'sub_processor', 'self']),
+  /** Id of an approved entry in config/processors.yaml (§69). */
+  processor: z.string().regex(/^[a-z0-9][a-z0-9-]{1,62}$/),
   purpose: z.string().min(1),
-  data_categories: z.array(z.string()).min(1),
-  data_location: z.string().min(1),
-  transfer_mechanism: z.string().min(1),
-  adr: z.string().regex(/^docs\/adr\//),
-  approved_by: z.string().min(1),
-  approved_on: z.string().date(),
+  /** True only for in-cell infrastructure on a private network (processor role 'self'). */
+  private_network: z.boolean().default(false),
 });
 export type EgressHost = z.infer<typeof EgressHostSchema>;
 
@@ -24,6 +19,15 @@ export const EgressPolicySchema = z.object({
   version: z.literal(1),
   default: z.literal('deny'),
   cells: z.record(z.string(), z.object({ hosts: z.array(EgressHostSchema) })),
+}).superRefine((p, ctx) => {
+  for (const [cell, { hosts }] of Object.entries(p.cells)) {
+    const seen = new Set<string>();
+    for (const h of hosts) {
+      const key = `${h.host}:${h.port}`;
+      if (seen.has(key)) ctx.addIssue({ code: 'custom', message: `cell ${cell}: duplicate host ${key}` });
+      seen.add(key);
+    }
+  }
 });
 export type EgressPolicy = z.infer<typeof EgressPolicySchema>;
 

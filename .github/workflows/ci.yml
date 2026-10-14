@@ -41,6 +41,13 @@ jobs:
       - run: pnpm lint
       - run: node scripts/secret-scan.ts
       - run: pnpm test:gate
+      - run: pnpm -s register:generate --check
+      - name: F2 runtime firewall check (nftables in network namespaces)
+        run: |
+          sudo apt-get install -y -q nftables iproute2 util-linux >/dev/null
+          out=$(sudo bash ops/nftables/verify-in-netns.sh ops/nftables/sevari-egress.nft 12345 | tail -1)
+          echo "$out"
+          echo "$out" | python3 -c "import json,sys; r=json.load(sys.stdin); assert r['app_https']=='blocked' and r['proxy_https']=='ok' and r['proxy_smtp']=='blocked' and r['loopback']=='ok' and r['dropped_packets']>0, r"
 
   contract-progress:
     name: contract progress (every test, red included; informational)

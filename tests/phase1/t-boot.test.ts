@@ -6,6 +6,7 @@ import { connect, type DbHandle } from '@sevari/db';
 import { MIGRATIONS_DIR } from '@sevari/db/admin';
 import { LocalKeyFileKms, type Kms } from '@sevari/crypto';
 import { runBootChecks, assertBoot, BootRefused, type BootDeps } from '@sevari/boot';
+import { FixedClock } from '@sevari/clock';
 import { contractSuite } from '../support/contract.ts';
 import { isolatedDatabase } from '../support/db.ts';
 import { fixtures } from '../support/fixtures.ts';
@@ -23,7 +24,7 @@ contractSuite('T-BOOT', () => {
     iso = await isolatedDatabase();
     f = fixtures(iso);
     app = connect(iso.appUrl);
-    deps = { db: app.db, kms, region: 'uk', configDir: join(ROOT, 'config'), egressPolicyPath: join(ROOT, 'config', 'egress.allowlist.yaml') };
+    deps = { db: app.db, kms, region: 'uk', configDir: join(ROOT, 'config'), egressPolicyPath: join(ROOT, 'config', 'egress.allowlist.yaml'), clock: new FixedClock(Date.parse('2026-10-14T09:00:00Z')) };
   });
   afterAll(async () => {
     await app.close();

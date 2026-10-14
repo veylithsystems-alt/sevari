@@ -1,6 +1,8 @@
 import { currentRoleFacts, lintSchema, migrationState, piiColumns, tableSecurity, type Db } from '@sevari/db';
 import type { Kms } from '@sevari/crypto';
-import { hostsForCell, loadEgressPolicy } from '@sevari/egress';
+import { crossCheck, hostsForCell, loadEgressPolicy, loadProcessorRegistry } from '@sevari/egress';
+import { join } from 'node:path';
+import type { Clock } from '@sevari/clock';
 import { registryGaps } from '@sevari/privacy';
 import { loadRegionConfig } from '@sevari/region';
 
@@ -23,6 +25,7 @@ export interface BootDeps {
   readonly configDir: string;
   readonly egressPolicyPath: string;
   readonly migrationsDir?: string;
+  readonly clock: Clock;
 }
 
 async function check(name: string, fn: () => Promise<string>): Promise<BootCheck> {
@@ -65,7 +68,10 @@ export async function runBootChecks(deps: BootDeps): Promise<BootReport> {
     check('egress.policy', async () => {
       const policy = await loadEgressPolicy(deps.egressPolicyPath);
       const hosts = hostsForCell(policy, deps.region);
-      return `default deny; ${hosts.length} allowlisted host(s) for ${deps.region}`;
+      const registry = await loadProcessorRegistry(join(deps.configDir, 'processors.yaml'));
+      const problems = crossCheck(policy, registry, deps.clock.now().toISOString().slice(0, 10));
+      if (problems.length) throw new Error(problems.join('; '));
+      return `default deny; ${hosts.length} allowlisted host(s) for ${deps.region}, all mapped to approved processors`;
     }),
     check('region.config', async () => {
       const cfg = await loadRegionConfig(deps.configDir, deps.region);

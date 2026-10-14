@@ -5,6 +5,7 @@
   "type": "module",
   "exports": { ".": "./src/index.ts" },
   "dependencies": {
+    "@sevari/clock": "workspace:*",
     "@sevari/crypto": "workspace:*",
     "@sevari/db": "workspace:*",
     "@sevari/domain": "workspace:*",
