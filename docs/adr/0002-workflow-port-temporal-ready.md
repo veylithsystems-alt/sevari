@@ -13,7 +13,7 @@ Define `WorkflowPort` with Temporal's model, not a plain queue's:
 - **Signals**: how human input (§30) and provider webhooks reach a waiting workflow.
 - **Queries**: read a workflow's state for the owner UI.
 
-v1 implementation: `graphile-worker` plus a `workflow_runs` table holding state, step results and timers, all tenant-scoped under RLS.
+v1 implementation: an in-repo Postgres queue (`job_queue`, DEV-007) with leases, retries and dead-lettering, claimed by the `sevari_worker` role (which can see queue rows only) and executed as the app role inside the tenant scope. Workflow state, step results and timers follow in a `workflow_runs` table, all tenant-scoped under RLS.
 
 ## Consequences
 - Moving to Temporal means writing a Temporal adapter and running both engines side by side per tenant during migration. No business logic changes.

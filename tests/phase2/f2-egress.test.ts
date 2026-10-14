@@ -41,7 +41,7 @@ contractSuite('F2', () => {
     const offenders: string[] = [];
     for (const f of files) {
       for (const m of readFileSync(f, 'utf8').matchAll(/\b(?:https?|wss?):\/\/([a-z0-9.[\]:-]+)/gi)) {
-        const host = m[1]!.toLowerCase().replace(/:\d+$/, '');
+        const host = m[1]!.toLowerCase().replace(/:\d+$/, '').replace(/\.+$/, '');
         if (!allowed.has(host) && !NON_ROUTABLE.test(host)) offenders.push(`${f.replace(ROOT + '/', '')}: ${host}`);
       }
     }

@@ -16,8 +16,8 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 |---|---|---|
 | 0 | Project skeleton, automatic checks, every contract test written | ✅ Done |
 | 1 | The secure database: businesses can never see each other's data, data stays in its region, the tamper-proof record, encryption | ✅ Done |
-| 2 | Receiving enquiries (web form, email, SMS), the outbound-connection guard, the supplier list | Next |
-| 3 | The rules engine: what the customer wants, prices, areas, availability, bookings | Planned |
+| 2 | Receiving enquiries (web form, email, SMS, API), the outbound-connection guard and firewall, the supplier register | ✅ Done |
+| 3 | The rules engine: what the customer wants, prices, areas, availability, bookings | Next |
 | 4 | The instant acknowledgement, and the fact-checker that stops made-up prices or dates | Planned |
 | 5 | The local AI models and how they're scored | Planned |
 | 18 → 6 | Your approvals: questions to you, one-tap approve, nothing sends without it | Planned |
@@ -32,6 +32,8 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 - The tamper-proof record really is tamper-proof. The tests attack it with full database admin rights; even rewriting the whole history is caught by a signature kept outside the database.
 - Personal details are encrypted with each business's own key. Destroying that key makes the data unreadable for good.
 - The app refuses to start if any safety check fails.
+- Enquiries arrive from website forms, email, SMS and the API. Each one is checked for a valid signature, stored encrypted, and queued in a single step. Sending the same message twice never creates a duplicate.
+- Sevari can't connect to any outside service unless you've approved that supplier. This is enforced three ways: in the code, by a gatekeeper process, and by the server's firewall (proven by a test). The supplier list (processor register) is generated automatically and currently says: no suppliers approved yet.
 
 **Things I found that you should know:**
 - Your old n8n build (v3.6 / v4.1) has 16 bugs I've written up in [`docs/reference/v4.1-behaviours.md`](docs/reference/v4.1-behaviours.md). The serious ones: the "tamper-proof" record could be changed without detection; an approval for one message could be used to send a different one; the approval page could run attacker-supplied code; the encryption step stored data unencrypted if its key was missing; and the erasure step failed with an error. The new build is designed so each of these can't happen, and has a test for each.
@@ -61,9 +63,14 @@ packages/
   egress/             allowlist (default deny); the only package allowed to make network calls
   privacy/            erasure registry (INV-6)
   boot/               boot guard (INV-9)
+  channels/           channel adapters: web form, signed webhook (email, API), SMS (fake provider until the Twilio ADR)
+  intake/             receive → authenticate → persist encrypted → queue, in one transaction; endpoints and API keys
+apps/api/             Fastify server: /v1/inbound/:channel/:publicId, health, CORS for forms, rate limits
+ops/nftables/         default-deny outbound firewall + a namespace test that proves it
 config/
   regions/uk.yaml     UK rule pack (counsel_signoff: null until counsel signs)
-  egress.allowlist.yaml
+  egress.allowlist.yaml   default deny; each host names an approved processor
+  processors.yaml         structured processor registry (§69); generates docs/PROCESSOR_REGISTER.md
 tests/
   contract/registry.ts  every contract test id, its phase and section
   contract/phases.json  phases claimed delivered (the CI gate enforces their tests)
@@ -101,7 +108,7 @@ pnpm contract:status  # table of contract tests: implemented? phase delivered?
 - `contract-progress`: every contract test, red included, plus the status table. Informational.
 
 ### Contract test status
-Run `pnpm contract:status` for the live table. At the end of Phase 1: F1, F4, T-AUD, T-BOOT, T-MIG, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
+Run `pnpm contract:status` for the live table. After Phase 2: F1 (database and API), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
 
 ### Documents
 - [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md): the binding contract (v1.9)

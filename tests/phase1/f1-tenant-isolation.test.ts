@@ -91,5 +91,5 @@ contractSuite('F1', () => {
     expect(() => tenantId("x' OR 1=1 --")).toThrow();
   });
 
-  it.todo('F1 via the API surface (Phase 2: intake and owner API)');
+  // F1 via the API surface: tests/phase2/t-idem-intake.test.ts
 });

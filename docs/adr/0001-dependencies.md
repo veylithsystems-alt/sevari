@@ -18,6 +18,8 @@ Licences are as declared in each package's `package.json` on npm at the pinned v
 | tsx | 4.20.6 | MIT | Running TS scripts | Node 22's type stripping covers most scripts; kept as a fallback | Active |
 | @types/node, @types/pg | 22.20.5 / 8.15.6 | MIT | Types | | |
 
-Planned (added in the phase that needs them, each with a row here first): fastify (MIT, §4 API), graphile-worker (MIT, job queue behind the workflow port, ADR-0002), @simplewebauthn/server (MIT, passkeys, CONTRACT_REVIEW R-13).
+| fastify | 5.6.2 | MIT | HTTP server for the API (§4) | Contract stack; raw-body parsing for signature checks; fast | Active |
+
+Planned (added in the phase that needs them, each with a row here first): @simplewebauthn/server (MIT, passkeys, CONTRACT_REVIEW R-13). Not adopted: graphile-worker / pg-boss (DEV-007).
 
 Not used, on purpose: no HTTP client library (the egress package wraps Node's own); no crypto library (Node's `crypto` provides AES-256-GCM, HKDF, HMAC and Ed25519); no Redis (§4).
