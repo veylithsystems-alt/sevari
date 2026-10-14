@@ -82,6 +82,17 @@ export const ERASURE_REGISTRY: Readonly<Record<string, TableEntry>> = {
       flags: { category: 'special', erasure: 'delete', dsar: true, note: 'routing signals for a human; never an inference about the person' },
     },
   },
+  suppressions: {
+    purpose: 'honour opt-outs immediately (§17.2)', lawfulBasis: 'legal obligation (PECR) / legitimate interests', category: 'contact',
+    retention: H(null, 'never'), erasure: 'retain-legal-hold',
+    legalHoldReason: 'A suppression must outlive erasure, or the person could be contacted again. Holds a keyed blind index only.',
+    columns: { recipient_bidx: { category: 'contact', erasure: 'retain-legal-hold', dsar: false, note: 'blind index only' } },
+  },
+  outbox: {
+    purpose: 'outbound messages and their delivery state', lawfulBasis: 'as the contact', category: 'contact', retention: H(730, 'relationship_end'), erasure: 'delete',
+    columns: { recipient_enc: enc(), recipient_bidx: enc(false), body_enc: enc(), body_digest: { category: 'contact', erasure: 'delete', dsar: false } },
+  },
+  reply_records: { purpose: 'metrics and evidence (§10.2), codes only', lawfulBasis: 'legitimate interests (quality, accountability)', category: 'none', retention: H(1095, 'created'), erasure: 'none', columns: {} },
   job_queue: { purpose: 'durable work queue (ids only)', lawfulBasis: 'as the underlying record', category: 'none', retention: H(30, 'created'), erasure: 'delete', columns: {} },
 };
 

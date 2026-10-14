@@ -1,0 +1,18 @@
+{
+  "host_cpus": 4,
+  "target_p95_ms": 10000,
+  "model_busy": {
+    "n": 20,
+    "p50_ms": 456,
+    "p95_ms": 490,
+    "p99_ms": 494,
+    "max_ms": 494
+  },
+  "model_busy_slow_provider": {
+    "n": 20,
+    "p50_ms": 3264,
+    "p95_ms": 4805,
+    "p99_ms": 4806,
+    "max_ms": 4806
+  }
+}

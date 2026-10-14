@@ -30,6 +30,8 @@ export type IntakeResult =
 
 /** The next workflow step for every new inbound message (Phase 3 picks it up). */
 export const INBOUND_JOB = 'inbound.process';
+/** The deterministic acknowledgement (§5.2, F7). Queued in the same transaction as the message. */
+export const ACK_JOB = 'ack.send';
 
 export async function receiveInbound(deps: IntakeDeps, req: { channel: ChannelId; publicId: string; raw: RawInbound }): Promise<IntakeResult> {
   const adapter = deps.adapters[req.channel];
@@ -104,6 +106,7 @@ async function persist(deps: IntakeDeps, tx: TenantTx, endpointId: string, lawfu
     return { status: 'accepted', messageId: winner.id, duplicate: true };
   }
 
+  await enqueue(tx, { kind: ACK_JOB, dedupeKey: messageId, payload: { message_id: messageId } });
   await enqueue(tx, { kind: INBOUND_JOB, dedupeKey: messageId, payload: { message_id: messageId } });
   await appendAudit(tx, {
     type: 'message.received', actor: { kind: 'customer', ref: `contact:${contactId}` }, subject: `message:${messageId}`,

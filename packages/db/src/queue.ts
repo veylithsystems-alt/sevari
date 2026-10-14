@@ -49,6 +49,8 @@ export interface WorkerQueue {
   fail(jobId: string, workerId: string, error: string, retryInMs: number): Promise<'retry' | 'dead' | 'lost'>;
   /** Returns expired leases to the queue (crashed workers). */
   reapExpired(): Promise<number>;
+  /** Calls `onQueued` whenever any job is queued in this database (LISTEN sevari_jobs). */
+  subscribe(onQueued: () => void): () => Promise<void>;
   close(): Promise<void>;
 }
 
@@ -97,6 +99,16 @@ export function workerQueue(workerUrl: string, region: RegionCode): WorkerQueue 
         .where('state', '=', 'running').where('locked_until', '<', sql<Date>`clock_timestamp()`).executeTakeFirst();
       return Number(r.numUpdatedRows);
     }),
+    subscribe: (onQueued) => {
+      const client = new pg.Client({ connectionString: workerUrl });
+      client.on('error', () => undefined);
+      client.on('notification', () => onQueued());
+      const ready = client.connect().then(() => client.query('LISTEN sevari_jobs'));
+      return async () => {
+        await ready.catch(() => undefined);
+        await client.end().catch(() => undefined);
+      };
+    },
     close: () => db.destroy(),
   };
 }

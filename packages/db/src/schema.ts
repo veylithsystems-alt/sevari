@@ -180,6 +180,70 @@ export interface EnquiriesTable extends Meta {
   analysed_at: Date;
 }
 
+export interface SuppressionsTable extends Meta {
+  id: Generated<string>;
+  tenant_id: string;
+  region: string;
+  channel_scope: 'sms' | 'email' | 'all';
+  recipient_bidx: Buffer;
+  reason: 'stop_keyword' | 'opt_out_request' | 'provider_block' | 'owner' | 'complaint';
+  source_ref: string | null;
+}
+export type OutboxState = 'reserved' | 'sending' | 'sent' | 'ambiguous' | 'failed' | 'blocked';
+export interface OutboxTable extends Meta {
+  id: Generated<string>;
+  tenant_id: string;
+  region: string;
+  conversation_id: string;
+  contact_id: string;
+  in_reply_to: string | null;
+  channel: 'email' | 'sms' | 'webform' | 'api';
+  purpose: 'ack' | 'safety' | 'holding' | 'clarify' | 'reply' | 'marketing';
+  action_class: string;
+  dedupe_key: string;
+  recipient_enc: Buffer;
+  recipient_bidx: Buffer;
+  body_enc: Buffer;
+  body_digest: Buffer;
+  template_id: string | null;
+  template_version: string | null;
+  state: Generated<OutboxState>;
+  attempts: Generated<number>;
+  lease_until: Date | null;
+  provider: string | null;
+  provider_message_id: string | null;
+  last_error: string | null;
+  reserved_at: Date;
+  sent_at: Date | null;
+}
+export interface ReplyRecordsTable extends Meta {
+  id: Generated<string>;
+  tenant_id: string;
+  region: string;
+  inbound_message_id: string | null;
+  enquiry_id: string | null;
+  outbox_id: string | null;
+  purpose: string;
+  channel: string;
+  intent: string | null;
+  intent_confidence: ColumnType<string | null, number | null, never>;
+  generator: 'template' | 'model' | 'human';
+  template_id: string | null;
+  model_id: string | null;
+  tokens: number | null;
+  facts_used: string[];
+  facts_missing: string[];
+  grounding_ok: boolean;
+  grounding_failures: ColumnType<unknown, string, never>;
+  autonomy_decision: string;
+  approval_outcome: string | null;
+  edit_size: number | null;
+  edit_category: string | null;
+  send_result: string;
+  latency_ms: ColumnType<Record<string, number>, string, string>;
+  cost_minor: number | null;
+}
+
 export interface Database {
   regions: RegionsTable;
   tenants: TenantsTable;
@@ -195,4 +259,7 @@ export interface Database {
   job_queue: JobQueueTable;
   knowledge_records: KnowledgeRecordsTable;
   enquiries: EnquiriesTable;
+  suppressions: SuppressionsTable;
+  outbox: OutboxTable;
+  reply_records: ReplyRecordsTable;
 }

@@ -47,12 +47,18 @@ importers:
       '@sevari/knowledge':
         specifier: workspace:*
         version: link:packages/knowledge
+      '@sevari/outbound':
+        specifier: workspace:*
+        version: link:packages/outbound
       '@sevari/privacy':
         specifier: workspace:*
         version: link:packages/privacy
       '@sevari/region':
         specifier: workspace:*
         version: link:packages/region
+      '@sevari/templates':
+        specifier: workspace:*
+        version: link:packages/templates
       '@sevari/verticals':
         specifier: workspace:*
         version: link:packages/verticals
@@ -146,12 +152,21 @@ importers:
       '@sevari/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@sevari/grounding':
+        specifier: workspace:*
+        version: link:../../packages/grounding
       '@sevari/intake':
         specifier: workspace:*
         version: link:../../packages/intake
       '@sevari/knowledge':
         specifier: workspace:*
         version: link:../../packages/knowledge
+      '@sevari/outbound':
+        specifier: workspace:*
+        version: link:../../packages/outbound
+      '@sevari/templates':
+        specifier: workspace:*
+        version: link:../../packages/templates
       '@sevari/verticals':
         specifier: workspace:*
         version: link:../../packages/verticals
@@ -287,6 +302,27 @@ importers:
         specifier: workspace:*
         version: link:../domain
 
+  packages/outbound:
+    dependencies:
+      '@sevari/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@sevari/clock':
+        specifier: workspace:*
+        version: link:../clock
+      '@sevari/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@sevari/db':
+        specifier: workspace:*
+        version: link:../db
+      '@sevari/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@sevari/grounding':
+        specifier: workspace:*
+        version: link:../grounding
+
   packages/privacy:
     dependencies:
       '@sevari/domain':
@@ -304,6 +340,12 @@ importers:
       zod:
         specifier: 3.25.76
         version: 3.25.76
+
+  packages/templates:
+    dependencies:
+      '@sevari/domain':
+        specifier: workspace:*
+        version: link:../domain
 
   packages/verticals:
     dependencies:
