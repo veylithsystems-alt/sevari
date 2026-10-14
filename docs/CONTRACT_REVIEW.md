@@ -52,6 +52,10 @@ Legend: **R** = recommendation, **Q** = needs Dan's decision (see `docs/QUESTION
 
 **R-18. Supply-chain specifics.** *Add to §36.3:* an exact-version lockfile (done), install scripts disabled except an allowlist (done: only `esbuild`), a licence check in CI, an SBOM generated per build, and a rule that dependency updates arrive as their own PRs.
 
+**R-19. Audit in its own trust boundary.** From the Synchronicity design (separate audit database): move the audit tables into a dedicated schema owned by a dedicated role, so neither the app nor the migration role can alter them, and back the audit up separately. *Change:* add to INV-8. **C** (tightens §3).
+
+**R-20. Companies House pre-fill at onboarding.** From the vision's EKP enrichment: the owner enters a company number and the system drafts knowledge records (registered name, address, SIC codes) **for the owner to confirm** (§18). This automates a real chore lawfully, using a public register about the tenant's own business. *Change:* add to §18; it needs a provider ADR (Companies House API) and an allowlist entry.
+
 ## 4. Product and law: items that need a decision, not code
 
 **Q-1. The seven agents (BASTION, SENTINEL, HERALD, VANGUARD, COMPASS, LEDGER, FORGE).** The briefs sell seven named agents. The contract never mentions them. My mapping:
