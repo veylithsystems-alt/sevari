@@ -77,9 +77,9 @@ contractSuite('F7', () => {
       const r = await receiveInbound(intake, { channel: 'email', publicId: ep.publicId, raw: { body, headers: { 'x-sevari-timestamp': String(ts), 'x-sevari-signature': signWebhook(ep.secret!, ts, body) }, url: 'x' } });
       return r.status === 'accepted' ? r.messageId : '';
     }));
-    const deadline = Date.now() + 60_000;
+    const deadline = clock.nowMs() + 60_000;
     let latencies: number[] = [];
-    while (Date.now() < deadline) {
+    while (clock.nowMs() < deadline) {
       const rows = await withTenant(h.db, t, (tx) => tx.selectFrom('reply_records').select('latency_ms').where('inbound_message_id', 'in', ids).where('send_result', '=', 'sent').execute());
       latencies = rows.map((r) => (r.latency_ms as Record<string, number>)['received_to_provider_accepted'] ?? Infinity);
       if (latencies.length === ids.length) break;
