@@ -21,7 +21,9 @@
     "contract:status": "tsx scripts/contract-status.ts",
     "eval": "node eval/run.ts",
     "secrets:scan": "gitleaks detect --no-banner --redact --config .gitleaks.toml",
-    "check": "pnpm typecheck && pnpm lint && pnpm test:gate"
+    "check": "pnpm typecheck && pnpm lint && pnpm test:gate",
+    "models:bench": "node eval/models/bench.ts",
+    "models:registry": "node scripts/model-registry.ts"
   },
   "devDependencies": {
     "@eslint/js": "9.39.1",
@@ -37,6 +39,7 @@
     "@sevari/grounding": "workspace:*",
     "@sevari/intake": "workspace:*",
     "@sevari/knowledge": "workspace:*",
+    "@sevari/llm": "workspace:*",
     "@sevari/outbound": "workspace:*",
     "@sevari/privacy": "workspace:*",
     "@sevari/region": "workspace:*",

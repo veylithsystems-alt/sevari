@@ -27,6 +27,8 @@ export const COMMITMENTS: readonly string[] = [
   'accredited', 'certified', 'approved', 'registered', 'licensed', 'qualified', 'promise', 'definitely', 'always', '24 hours', '24/7', '24 7',
   'waive', 'waived', 'goodwill', 'no cost', 'at no cost', 'on the house', 'half price', 'unlimited', 'cheapest', 'lowest price', 'price match',
   'cash price', 'cash discount', 'covered', 'included', 'includes', 'all inclusive',
+  // Booking confirmations: only the booking flow (Phase 6+) confirms a slot, never free text.
+  'booking is confirmed', 'appointment is confirmed', 'you are booked', 'booked in for', 'see you on', 'see you at',
 ];
 
 export function checkServiceClaims(draft: string, services: readonly ServiceFact[]): SemanticFailure[] {

@@ -26,6 +26,7 @@ export const CONTRACT_TESTS: readonly ContractTest[] = [
   t('F6', '6', '§10.1', 'Approvals: single-use, expiry in query, digest mismatch, concurrent consume'),
   t('F7', '4', '§10.1', 'ACK latency p50/p95/p99 under 20 concurrent enquiries while model busy'),
   t('F8', '6', '§10.1', 'No consequential action without approval or grant, in either mode'),
+  t('T-LLM', '5', '§9 §5.3 §36.3', 'Model layer: schema-checked, fallback only, grounded, degrades to rules, registry-selected, human-promoted'),
   t('T-BOOT', '1', '§3 INV-9', 'App refuses to start if any boot check fails'),
   t('T-AUD', '1', '§3 INV-8', 'Audit log append-only and hash-chained; app role cannot UPDATE/DELETE'),
   t('T-SEC', '0', '§3 INV-10', 'No production secret in the repo (gitleaks config + scan)'),

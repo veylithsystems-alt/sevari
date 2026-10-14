@@ -21,6 +21,13 @@ Each item needs evidence in this folder and Dan's dated sign-off recorded as a h
 | PR-10 | Cancellation, export and erasure end to end | P | | |
 | PR-11 | Pilot agreement and success criteria per pilot | P | | |
 
+## Phase exits that need the target box
+
+| # | Item | Evidence | Status |
+|---|---|---|---|
+| MB-1 | Model benchmark table on the 16GB VPS (§11 Phase 5 exit, §9) | `eval/models/BENCHMARK.md` + `eval/models/results/` ([how](../ops/model-benchmark.md)) | not run (DEV-010) |
+| MB-2 | F7 ACK latency re-measured on the VPS while the model is busy | `eval/perf/` | build-box figure only |
+
 ## Value Gate (§64), before wider commercial launch
 
 | Gate | Evidence | Status |

@@ -47,8 +47,23 @@ export interface BootstrapOptions {
   readonly workerPassword: string;
 }
 
-/** Creates the owner and app roles and hands the schema to the owner. Idempotent. */
+/**
+ * Creates the owner and app roles and hands the schema to the owner. Idempotent. Roles are cluster-wide
+ * (and advisory locks are per database), so two databases bootstrapped at the same moment can collide
+ * on the same role row ("tuple concurrently updated"); that one error is retried.
+ */
 export async function bootstrapCluster(opts: BootstrapOptions): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await bootstrapOnce(opts);
+    } catch (err) {
+      if (attempt >= 8 || !/tuple concurrently (updated|deleted)/.test((err as Error).message)) throw err;
+      await new Promise((r) => setTimeout(r, 25 * attempt));
+    }
+  }
+}
+
+async function bootstrapOnce(opts: BootstrapOptions): Promise<void> {
   const client = new pg.Client({ connectionString: opts.superUrl });
   await client.connect();
   try {

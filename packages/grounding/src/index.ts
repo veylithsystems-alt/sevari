@@ -5,7 +5,8 @@
  *
  * Rules:
  *  - Every claim in the draft (money, %, dates, times, phones, emails, hosts, postcodes, numbers) must
- *    be supported by an authorised fact or appear in the customer's own message.
+ *    be supported by an authorised fact. The customer's own postcode, phone, email, dates and times may
+ *    be echoed back; their prices, percentages and numbers may not.
  *  - No special-category reference unless the customer raised it (§8.4).
  *  - Service and acknowledgement messages contain no marketing language (§50.3, §23).
  *  - The model never certifies itself (§68): this is deterministic and blocks; it never edits.
@@ -50,13 +51,19 @@ export type GroundingResult =
 const SPECIAL = ['pregnant', 'pregnancy', 'cancer', 'hiv', 'disabled', 'disability', 'dementia', 'mental health', 'religion', 'muslim', 'christian', 'jewish', 'sikh', 'hindu', 'gay', 'lesbian', 'bisexual', 'transgender', 'trade union', 'criminal record', 'ethnicity', 'race'];
 const MARKETING = ['special offer', 'offer ends', 'discount', 'sale', 'deal', 'deals', 'promotion', 'promo', 'limited time', 'special price', 'exclusive', 'free gift', 'voucher', 'subscribe', 'newsletter', 'follow us', 'refer a friend', '% off', 'percent off', 'book now and save'];
 
+const CUSTOMER_ECHO_KINDS: ReadonlySet<Claim['kind']> = new Set(['postcode', 'phone', 'email', 'date', 'time']);
+
 export function ground(text: string, purpose: MessagePurpose, sources: GroundingSources, ctx: ExtractContext): GroundingResult {
   const failures: GroundingFailure[] = [];
   const claims = extractClaims(text, ctx);
   if (!text.trim()) failures.push({ rule: 'empty', detail: 'empty message' });
 
   const supported = new Set<string>();
-  for (const t of [...sources.factTexts, sources.customerText]) for (const c of extractClaims(t, ctx)) supported.add(claimKey(c));
+  for (const t of sources.factTexts) for (const c of extractClaims(t, ctx)) supported.add(claimKey(c));
+  // The customer's own details may be echoed back (their postcode, phone, email, the day they asked for).
+  // Their money, percentages, numbers and links never support a claim: "quote me £10" must not let a
+  // reply say "£10" (prompt-injection and anchoring defence, eval/models/injection.jsonl).
+  for (const c of extractClaims(sources.customerText, ctx)) if (CUSTOMER_ECHO_KINDS.has(c.kind)) supported.add(claimKey(c));
   // No cross-kind support: "£60 an hour" supports "£60 an hour", never a bare "60" ("60 engineers").
   for (const c of claims) {
     if (!supported.has(claimKey(c))) failures.push({ rule: 'unsupported_claim', detail: `${c.kind} "${c.raw}" is not in the authorised facts or the customer's message` });

@@ -15,6 +15,7 @@
     "@sevari/grounding": "workspace:*",
     "@sevari/intake": "workspace:*",
     "@sevari/knowledge": "workspace:*",
+    "@sevari/llm": "workspace:*",
     "@sevari/outbound": "workspace:*",
     "@sevari/templates": "workspace:*",
     "@sevari/verticals": "workspace:*"

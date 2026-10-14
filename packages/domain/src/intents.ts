@@ -39,7 +39,32 @@ export interface IntentResult {
   readonly abstained: boolean;
   readonly scores: Readonly<Partial<Record<Intent, number>>>;
   readonly matched: readonly string[];
-  readonly source: 'rules';
+  readonly source: 'rules' | 'model';
+  /** Set when source is 'model' (§32 lineage). */
+  readonly model?: { readonly modelId: string; readonly promptId: string };
+}
+
+/** A model's label for a message the rules abstained on (Phase 5). */
+export interface ModelIntent {
+  readonly intent: Intent;
+  readonly confidence: number;
+  readonly modelId: string;
+  readonly promptId: string;
+}
+
+/**
+ * Intents a model may never act on by itself: STOP, risk to life, data rights and complaints are
+ * decided by deterministic rules or a human. A model label of one of these sends the case to a person.
+ */
+export const MODEL_ESCALATE_INTENTS: ReadonlySet<Intent> = new Set(['opt_out', 'emergency', 'data_rights', 'complaint']);
+
+/** Uses the model's label only when the rules abstained and the model did not (§5.3: rules first). */
+export function withModelFallback(rules: IntentResult, model: ModelIntent | undefined): IntentResult {
+  if (!rules.abstained || !model || model.intent === 'other') return rules;
+  return {
+    intent: model.intent, confidence: Math.min(1, Math.max(0, model.confidence)), abstained: false, scores: rules.scores,
+    matched: [...rules.matched, `model:${model.modelId}`], source: 'model', model: { modelId: model.modelId, promptId: model.promptId },
+  };
 }
 
 export function classifyIntent(text: string, pack: VerticalPack, opts: { minScore?: number; minMargin?: number; flags?: readonly SensitiveFlag[] } = {}): IntentResult {

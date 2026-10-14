@@ -47,6 +47,9 @@ importers:
       '@sevari/knowledge':
         specifier: workspace:*
         version: link:packages/knowledge
+      '@sevari/llm':
+        specifier: workspace:*
+        version: link:packages/llm
       '@sevari/outbound':
         specifier: workspace:*
         version: link:packages/outbound
@@ -161,6 +164,9 @@ importers:
       '@sevari/knowledge':
         specifier: workspace:*
         version: link:../../packages/knowledge
+      '@sevari/llm':
+        specifier: workspace:*
+        version: link:../../packages/llm
       '@sevari/outbound':
         specifier: workspace:*
         version: link:../../packages/outbound
@@ -301,6 +307,27 @@ importers:
       '@sevari/domain':
         specifier: workspace:*
         version: link:../domain
+
+  packages/llm:
+    dependencies:
+      '@sevari/clock':
+        specifier: workspace:*
+        version: link:../clock
+      '@sevari/db':
+        specifier: workspace:*
+        version: link:../db
+      '@sevari/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@sevari/egress':
+        specifier: workspace:*
+        version: link:../egress
+      '@sevari/grounding':
+        specifier: workspace:*
+        version: link:../grounding
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
 
   packages/outbound:
     dependencies:

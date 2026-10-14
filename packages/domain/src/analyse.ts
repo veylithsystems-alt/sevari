@@ -3,7 +3,7 @@
  * happens next. The model (Phase 5) may only word what this returns.
  */
 import { assessEligibility, type Eligibility } from './eligibility.ts';
-import { classifyIntent, detectServices, type IntentResult } from './intents.ts';
+import { classifyIntent, detectServices, MODEL_ESCALATE_INTENTS, withModelFallback, type IntentResult, type ModelIntent } from './intents.ts';
 import type { KnowledgeSnapshot } from './knowledge.ts';
 import type { VerticalPack } from './pack.ts';
 import { priceFor, type PriceAnswer } from './pricing.ts';
@@ -55,18 +55,20 @@ export interface AnalyseInput {
   /** How many clarifying questions this conversation has already had (§30.4). */
   readonly clarificationsSoFar?: number;
   readonly maxClarifications?: number;
+  /** The model's label, used only if the rules abstain (Phase 5). The caller asks the model outside any transaction. */
+  readonly modelIntent?: ModelIntent;
 }
 
 export function analyseEnquiry(input: AnalyseInput): EnquiryAnalysis {
   const text = input.subject ? `${input.subject}\n${input.text}` : input.text;
   const flags = sensitiveFlags(text);
-  const intent = classifyIntent(text, input.pack, { flags });
+  const intent = withModelFallback(classifyIntent(text, input.pack, { flags }), input.modelIntent);
   const catalogue = mergeCatalogue(input.pack, input.knowledge);
   const services = detectServices(text, catalogue);
   const extracted = extractSlots(input.text, { nowMs: input.nowMs, timezone: input.timezone, ...(input.fromName ? { fromName: input.fromName } : {}) });
   // An emergency is urgent by definition, whatever words were used.
-  const slots = intent.intent === 'emergency' && !intent.abstained ? { ...extracted, urgency: 'emergency' as const } : extracted;
-  const wantsEmergency = intent.intent === 'emergency' || slots.urgency === 'emergency';
+  const slots = intent.intent === 'emergency' && intent.source === 'rules' && !intent.abstained ? { ...extracted, urgency: 'emergency' as const } : extracted;
+  const wantsEmergency = (intent.intent === 'emergency' && intent.source === 'rules') || slots.urgency === 'emergency';
   const eligibility = assessEligibility(input.knowledge, { serviceCodes: services, ...(slots.outwardCode ? { outwardCode: slots.outwardCode } : {}), nowMs: input.nowMs, wantsEmergency });
   const h = normaliseForMatch(text);
   const faqs = input.knowledge.faqs.filter((f) => f.body.keywords.some((kw) => hasAffirmed(h, kw))).map((f) => `${f.id}@${f.version}`);
@@ -82,6 +84,8 @@ export function analyseEnquiry(input: AnalyseInput): EnquiryAnalysis {
 
   // Order matters: safety, then rights and opt-out, then always-human, then the normal path.
   if (flags.includes('risk_to_life')) return done('safety_first');
+  // A model never triggers a suppression, a safety message or a rights process by itself: a person decides.
+  if (intent.source === 'model' && MODEL_ESCALATE_INTENTS.has(intent.intent)) return done('human_only');
   if (flags.includes('opt_out') || intent.intent === 'opt_out') return done('opt_out');
   if (flags.some((f) => ALWAYS_HUMAN_FLAGS.has(f)) || intent.intent === 'data_rights' || intent.intent === 'complaint') return done('human_only');
 

@@ -178,6 +178,30 @@ export interface EnquiriesTable extends Meta {
   facts_missing: string[];
   analysis_enc: Buffer;
   analysed_at: Date;
+  intent_model_id: ColumnType<string | null, string | null | undefined, never>;
+  intent_prompt_id: ColumnType<string | null, string | null | undefined, never>;
+}
+
+export interface ModelRegistryTable extends Meta {
+  id: Generated<string>;
+  region: string;
+  model_id: string;
+  provider: 'ollama' | 'vllm' | 'vsap' | 'fake';
+  family: string;
+  params_b: ColumnType<string, number, number>;
+  quantisation: string;
+  host: string;
+  ctx_tokens: number;
+  licence: string;
+  tokens_per_s: ColumnType<string | null, number | null | undefined, number | null>;
+  p95_latency_ms: ColumnType<Record<string, number>, string | undefined, string>;
+  eval_scores: ColumnType<Record<string, Record<string, number>>, string | undefined, string>;
+  bench_ref: string | null;
+  cost_per_1k_minor: ColumnType<string, number | undefined, number>;
+  status: Generated<'candidate' | 'active' | 'retired'>;
+  promoted_by: string | null;
+  promoted_at: Date | null;
+  retired_reason: string | null;
 }
 
 export interface SuppressionsTable extends Meta {
@@ -242,6 +266,7 @@ export interface ReplyRecordsTable extends Meta {
   send_result: string;
   latency_ms: ColumnType<Record<string, number>, string, string>;
   cost_minor: number | null;
+  prompt_id: ColumnType<string | null, string | null | undefined, never>;
 }
 
 export interface Database {
@@ -262,4 +287,5 @@ export interface Database {
   suppressions: SuppressionsTable;
   outbox: OutboxTable;
   reply_records: ReplyRecordsTable;
+  model_registry: ModelRegistryTable;
 }

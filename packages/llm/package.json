@@ -1,0 +1,17 @@
+{
+  "name": "@sevari/llm",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@sevari/clock": "workspace:*",
+    "@sevari/db": "workspace:*",
+    "@sevari/domain": "workspace:*",
+    "@sevari/egress": "workspace:*",
+    "@sevari/grounding": "workspace:*",
+    "zod": "3.25.76"
+  }
+}
