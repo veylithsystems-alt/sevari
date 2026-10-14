@@ -3,7 +3,7 @@
  * positive (§20.1). Any hit takes the enquiry off the automatic path to an owner, with only a holding
  * acknowledgement. Risk to life gets the safety-first reply (§42) before anything else.
  */
-import { hasAffirmed, hasPhrase, normaliseForMatch } from './text.ts';
+import { hasAffirmed, hasPhrase, normaliseForMatch, stemTokens } from './text.ts';
 
 export type SensitiveFlag =
   | 'risk_to_life' | 'legal_threat' | 'regulator' | 'safeguarding' | 'injury_or_damage' | 'discrimination'
@@ -19,8 +19,8 @@ const RULES: ReadonlyArray<[SensitiveFlag, readonly string[]]> = [
   ['media', ['journalist', 'newspaper', 'press', 'reporter', 'going to the papers', 'bbc', 'watchdog']],
   ['data_rights', ['subject access', 'access request', 'delete my data', 'erase my data', 'my personal data', 'gdpr', 'data protection', 'what data you hold', 'right to be forgotten']],
   ['vulnerable_customer', ['elderly', 'disabled', 'disability', 'wheelchair', 'carer', 'dementia', 'pregnant', 'newborn', 'bereaved', 'bereavement', 'passed away', 'terminally ill', 'hospital', 'mental health', 'struggling to pay', 'can\'t afford']],
-  ['complaint', ['complaint', 'complain', 'not happy', 'unhappy', 'disappointed', 'terrible service', 'poor service', 'shoddy', 'refund', 'want my money back', 'still not fixed', 'came back worse', 'unacceptable', 'disgusted']],
-  ['opt_out', ['stop', 'unsubscribe', 'stop texting', 'stop messaging', 'remove me', 'opt out', 'don\'t contact me', 'do not contact me']],
+  ['complaint', ['complaint', 'complain', 'not happy', 'unhappy', 'disappointed', 'terrible service', 'poor service', 'shoddy', 'refund', 'want my money back', 'money back', 'rip off', 'ripped off', 'still not fixed', 'came back worse', 'unacceptable', 'disgusted', 'worse than before']],
+  ['opt_out', ['unsubscribe', 'stop texting', 'stop messaging', 'stop contacting', 'remove me', 'opt out', 'don\'t contact me', 'do not contact me', 'no more messages']],
   ['special_category', ['cancer', 'hiv', 'pregnant', 'religion', 'muslim', 'christian', 'jewish', 'sexuality', 'gay', 'lesbian', 'trade union', 'criminal record']],
 ];
 
@@ -33,6 +33,19 @@ export function sensitiveFlags(text: string): SensitiveFlag[] {
     const strict = flag === 'risk_to_life' || flag === 'legal_threat' || flag === 'safeguarding';
     if (phrases.some((p) => (strict ? hasPhrase(h, p) : hasAffirmed(h, p)))) out.add(flag);
   }
+  // Combinations that signal danger even when no single phrase does (recall first).
+  const tokens = stemTokens(text);
+  const near = (a: readonly string[], b: readonly string[], window = 10) => tokens.some((t, i) =>
+    a.includes(t) && tokens.slice(Math.max(0, i - window), i + window + 1).some((u) => b.includes(u)));
+  const WATER = ['water', 'leak', 'drip', 'pour', 'flood'];
+  const ELECTRIC = ['light', 'electric', 'electr', 'socket', 'fus', 'wir', 'switch', 'fitt'];
+  const CHILD = ['child', 'toddler', 'baby', 'kid', 'son', 'daughter', 'dog', 'pet', 'grandad', 'nan', 'mum', 'dad'];
+  // Lists hold stems (see stem()): "coming" -> "com", "trapped" -> "trapp", "ceiling" -> "ceil".
+  const TRAPPED = ['lock', 'trapp', 'stuck', 'shut'];
+  const CEILING = ['ceil'];
+  const FALLING = ['bow', 'sag', 'com', 'down', 'collaps', 'fall', 'crack'];
+  if (near(WATER, ELECTRIC) || near(CEILING, FALLING, 6) || (near(CHILD, TRAPPED, 4) && /\b(in|inside)\b/i.test(text) && /\b(car|room|bathroom|house|flat|toilet|garage|hot)\b/i.test(text))) out.add('risk_to_life');
+  if (near(['hurt', 'injur', 'cut', 'burn', 'brok'], ['hand', 'arm', 'leg', 'head', 'finger', 'himself', 'herself', 'myself', 'back'], 4)) out.add('injury_or_damage');
   // A bare "STOP" message is an opt-out on SMS (§50.3, F39).
   if (/^\s*(stop|stopall|unsubscribe|cancel|end|quit)\s*$/i.test(text)) out.add('opt_out');
   return [...out];

@@ -42,8 +42,8 @@ export function extractSlots(text: string, ctx: { nowMs: number; timezone: strin
   const phone = phoneRaw ? normalisePhone(phoneRaw) ?? undefined : undefined;
 
   const urgency: Slots['urgency'] =
-    ['emergency', 'urgent', 'urgently', 'asap', 'as soon as possible', 'right now', 'immediately', 'tonight', 'flooding', 'locked out'].some((p) => hasAffirmed(h, p)) ? 'emergency'
-      : ['today', 'tomorrow', 'this week', 'soon', 'quickly'].some((p) => hasAffirmed(h, p)) ? 'soon'
+    ['emergency', 'urgent', 'urgently', 'asap', 'as soon as possible', 'right now', 'immediately', 'tonight', 'flooding', 'locked out', 'hurry', 'how quickly', "can't get in"].some((p) => hasAffirmed(h, p)) ? 'emergency'
+      : ['today', 'tomorrow', 'this week', 'soon', 'this afternoon', 'this morning'].some((p) => hasAffirmed(h, p)) ? 'soon'
         : ['no rush', 'whenever', 'not urgent', 'next month', 'in the spring', 'in the summer', 'flexible'].some((p) => h.includes(normaliseForMatch(p))) ? 'flexible'
           : 'unspecified';
 

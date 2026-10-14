@@ -59,11 +59,13 @@ export interface AnalyseInput {
 
 export function analyseEnquiry(input: AnalyseInput): EnquiryAnalysis {
   const text = input.subject ? `${input.subject}\n${input.text}` : input.text;
-  const intent = classifyIntent(text, input.pack);
   const flags = sensitiveFlags(text);
+  const intent = classifyIntent(text, input.pack, { flags });
   const catalogue = mergeCatalogue(input.pack, input.knowledge);
   const services = detectServices(text, catalogue);
-  const slots = extractSlots(input.text, { nowMs: input.nowMs, timezone: input.timezone, ...(input.fromName ? { fromName: input.fromName } : {}) });
+  const extracted = extractSlots(input.text, { nowMs: input.nowMs, timezone: input.timezone, ...(input.fromName ? { fromName: input.fromName } : {}) });
+  // An emergency is urgent by definition, whatever words were used.
+  const slots = intent.intent === 'emergency' && !intent.abstained ? { ...extracted, urgency: 'emergency' as const } : extracted;
   const wantsEmergency = intent.intent === 'emergency' || slots.urgency === 'emergency';
   const eligibility = assessEligibility(input.knowledge, { serviceCodes: services, ...(slots.outwardCode ? { outwardCode: slots.outwardCode } : {}), nowMs: input.nowMs, wantsEmergency });
   const h = normaliseForMatch(text);
@@ -104,9 +106,15 @@ export function analyseEnquiry(input: AnalyseInput): EnquiryAnalysis {
   eligibility.missing.filter((m) => m.startsWith('knowledge:')).forEach((m) => factsMissing.add(m));
   const extra = { ...(price ? { price } : {}), ...(windows ? { windows } : {}) };
 
+  // Requests about an existing job need the booking record (lifecycle, Phase 9): UNKNOWN until then.
+  if (intent.intent === 'follow_up' || intent.intent === 'reschedule' || intent.intent === 'cancel') {
+    factsMissing.add('booking_record');
+    return done('unknown', extra);
+  }
   // Clarify what the customer can tell us; UNKNOWN for what only the owner can.
+  const required = REQUIRED_SLOTS[intent.intent] ?? [];
   const askable = (intent.abstained ? ['what_needed'] : []).concat(
-    eligibility.missing.filter((m) => m === 'service' || m === 'postcode'),
+    eligibility.missing.filter((m) => required.includes(m)),
   );
   const maxClar = input.maxClarifications ?? 2;
   if (askable.length && (input.clarificationsSoFar ?? 0) < maxClar) {
@@ -122,6 +130,16 @@ export function analyseEnquiry(input: AnalyseInput): EnquiryAnalysis {
   if (factsMissing.size > 0) return done('unknown', extra);
   return done('answer', extra);
 }
+
+/** What the customer must tell us before we can answer, per intent. */
+const REQUIRED_SLOTS: Partial<Record<IntentResult['intent'], readonly string[]>> = {
+  emergency: ['service', 'postcode'],
+  booking_request: ['service', 'postcode'],
+  quote_request: ['service', 'postcode'],
+  availability_question: ['service'],
+  price_question: ['service'],
+  service_question: ['service'],
+};
 
 function mergeCatalogue(pack: VerticalPack, k: KnowledgeSnapshot) {
   const byCode = new Map(pack.services.map((s) => [s.code, { code: s.code, name: s.name, keywords: [...s.keywords] }]));

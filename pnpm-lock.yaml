@@ -47,6 +47,9 @@ importers:
       '@sevari/region':
         specifier: workspace:*
         version: link:packages/region
+      '@sevari/verticals':
+        specifier: workspace:*
+        version: link:packages/verticals
       '@testcontainers/postgresql':
         specifier: 11.7.2
         version: 11.7.2
@@ -241,6 +244,12 @@ importers:
       zod:
         specifier: 3.25.76
         version: 3.25.76
+
+  packages/verticals:
+    dependencies:
+      '@sevari/domain':
+        specifier: workspace:*
+        version: link:../domain
 
   tools/eslint-plugin-sevari: {}
 

@@ -47,8 +47,9 @@ export function localToEpoch(date: string, hhmm: string, tz: string): number {
   const candidates = [tzOffsetMinutes(naive - 12 * 3_600_000, tz), tzOffsetMinutes(naive + 12 * 3_600_000, tz)];
   const valid = candidates.map((off) => naive - off * 60_000).filter((t) => localParts(t, tz).date === date && localParts(t, tz).time === hhmm);
   if (valid.length) return Math.min(...valid);
-  // Skipped time (spring forward): first valid instant after it.
-  return naive - Math.max(...candidates) * 60_000;
+  // Skipped time (spring forward): read it with the pre-change offset, which lands just after the gap
+  // (01:30 GMT on the March change becomes 02:30 BST).
+  return naive - Math.min(...candidates) * 60_000;
 }
 
 export function addDays(date: string, n: number): string {
