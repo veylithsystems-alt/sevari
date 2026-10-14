@@ -5,7 +5,7 @@
  */
 export type Phase =
   | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '9b' | '10' | '11' | '12' | '13' | '14' | '15'
-  | '18' | '20' | '21' | '22' | '23' | '24' | '25' | 'K1' | 'K2' | 'K3' | 'K4' | 'K5' | 'K6';
+  | '18' | '20' | '21' | '22' | '23' | '24' | '25' | 'K1' | 'K2' | 'K3' | 'K4' | 'K5' | 'K6' | 'M1' | 'M2' | 'M3' | 'M4';
 
 export interface ContractTest {
   readonly id: string;
@@ -126,6 +126,22 @@ export const CONTRACT_TESTS: readonly ContractTest[] = [
   t('A10', 'K5', '§79', 'COMPASS reads only registered sources; reports carry no personal data'),
   t('A11', 'K6', '§79', 'FORGE cannot push to a default branch or deploy without approval'),
   t('A12', 'K6', '§79', 'Secrets never appear in a FORGE prompt or log'),
+  // Part M (v1.13)
+  t('T-COST-1', 'M1', '§86', 'A paid adapter cannot be enabled without a cost line, a revenue check and a platform decision'),
+  t('T-COST-2', 'M1', '§86', 'With every paid adapter off, Enquiry Mode works end to end on free channels'),
+  t('T-SMS-1', 'M1', '§87', 'No SMS, SMS approval or missed-call text for a tenant without an active paid plan'),
+  t('F59', 'M2', '§89', 'Integration data never reaches a customer as a fact without owner confirmation'),
+  t('F60', 'M2', '§89', 'With every integration disconnected, Enquiry Mode runs and the owner is notified'),
+  t('F61', 'M2', '§89', 'An action in an external platform without approval or grant is refused'),
+  t('F62', 'M2', '§89', 'A change from the non-master system creates a proposal; nothing is overwritten'),
+  t('F63', 'M2', '§89', 'Integration credentials never appear in prompts, logs or audit payloads'),
+  t('T-KNOW-1', 'M3', '§90', 'Repeated identical unknowns produce one owner question'),
+  t('T-KNOW-2', 'M3', '§90', 'A stale price is never used as a confirmed fact or changed without the owner'),
+  t('T-KNOW-3', 'M3', '§90', 'A disagreeing external source creates a proposal, never an edit'),
+  t('T-GROW-1', 'M4', '§91', 'The reply-speed check cannot target an unverified address or domain'),
+  t('T-GROW-2', 'M4', '§91', 'A referral reward is never granted before the referred tenant\'s second payment'),
+  t('T-GROW-3', 'M4', '§91', 'The fetcher cannot reach an unverified domain and has no tenant data access'),
+  t('T-GROW-4', 'M4', '§91', 'No marketing message to a check user without the separate consent'),
 ];
 
 /** T1–T23 come from the v3.6 resurrection review, which has not been supplied yet (see docs/reference/t-mapping.md). */

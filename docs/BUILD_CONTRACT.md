@@ -1,6 +1,6 @@
 # sevari-core — Build Contract for Claude Code
 
-Version 1.12 · 14 October 2026 (Part L: vision alignment — fast safe go-live, two authority scopes, any service business and self-sourced audience, FORGE deferred, claims wording; Part K: Agent Mode and acknowledging every human input, binding on Dan's merge; Part J: definition of finished, production readiness, value gate, delivery ambiguity, key management, grounding holdout, processor registry, recovery, legal precision; Part I: Twilio ADR draft answers; Part H: build checklist and Twilio ADR requirements; Part G: capacity and cost-floor model; missed-call text adapter confirmed, Part F; D1 and D3 confirmed; Part D: market, beachhead, trades; Part E: pilot market, pricing and outreach; Appendices 1–2: go-to-market and pilot plans) (Part B: full lifecycle §16–§27; Part C: decisions, human feedback, governed self-learning, platform hardening §28–§40) · Owner: Dan Hadfield (Veylith Systems)
+Version 1.13 · 14 October 2026 (Part M: free until revenue, texts for paying customers only, HIVE, integration layer, self-improving knowledge, growth; Part L: vision alignment — fast safe go-live, two authority scopes, any service business and self-sourced audience, FORGE deferred, claims wording; Part K: Agent Mode and acknowledging every human input, binding on Dan's merge; Part J: definition of finished, production readiness, value gate, delivery ambiguity, key management, grounding holdout, processor registry, recovery, legal precision; Part I: Twilio ADR draft answers; Part H: build checklist and Twilio ADR requirements; Part G: capacity and cost-floor model; missed-call text adapter confirmed, Part F; D1 and D3 confirmed; Part D: market, beachhead, trades; Part E: pilot market, pricing and outreach; Appendices 1–2: go-to-market and pilot plans) (Part B: full lifecycle §16–§27; Part C: decisions, human feedback, governed self-learning, platform hardening §28–§40) · Owner: Dan Hadfield (Veylith Systems)
 Status: binding on every pull request. If the code and this contract disagree, the code is wrong or the contract needs to be amended (§14). Nothing in between counts.
 
 ---
@@ -564,7 +564,7 @@ Each human queue has an SLA, a priority and a batching rule. Questions are de-du
 ### 30.7 Tests
 F22 (a response with no consumer is rejected), F23 (an applied input always has a receipt, and a missing receipt triggers an alert), F24 (timeout, ambiguity, wrong role and stale digest each lead to the declared safe state, never to approval), F25 (an owner edit generates a clarification, not a silent knowledge update), F26 (a reserved decision can't be answered by an unauthorised role), F27 (rubber-stamp detection).
 
-## 31. Governed self-learning (D4)
+## 31. Governed self-learning: HIVE (D4; named in §88)
 
 ### 31.1 Principle
 The system learns by **proposing changes, testing them, and promoting them through gates**. It never changes live behaviour in place. Learning improves wording, classification, ranking, thresholds and retrieval. **It never creates facts, never changes the legal perimeter, and never expands its own authority.**
@@ -1432,6 +1432,113 @@ FORGE keeps its name and its place in the Agent Mode design (Part K). It is **no
 ## 85. Claims wording (adds to §43)
 
 The ten statements listed in `docs/reference/original-vision.md` §7.3 go into the claims register with their evidence or a "do not publish until counsel confirms" status. Public copy uses the true versions given there.
+
+---
+
+# PART M — Free until revenue, HIVE, the integration layer, self-improving knowledge and growth (added in v1.13)
+
+Source: Dan's decisions of 14 October 2026. Part M overrides earlier parts where they conflict. It doesn't touch §3 or §8.3.
+
+## 86. Free to run until Sevari earns money (cost gate)
+
+1. **Rule.** Sevari must not create running costs before it generates revenue, beyond the unavoidable base (the cell's server, domain and certificates: the fixed cash cost in Part G).
+2. **Every paid service sits behind a port with a free default.** Examples: local models instead of paid AI; a self-hosted web fetcher instead of a paid scraping service; the local key file before a paid KMS (§67 keeps the boundary); self-hosted monitoring; free provider tiers where they exist. The paid adapter is built, tested and kept ready, but stays **off**.
+3. **Switching on a paid service** needs: a processor entry and ADR (§29, §69); a cost line in the capacity model (Part G); evidence that monthly revenue covers its forecast cost with margin (from billing data, §13 phases); and Dan's recorded decision (platform scope, §82). It is a configuration change with an approval record, never a code change.
+4. Fees that only arise when Veylith is paid (card processing) are allowed.
+5. Per-tenant costs (texts, numbers) are allowed only for tenants whose subscription covers them (§87).
+
+Tests: **T-COST-1** a paid adapter can't be enabled without a cost line, a revenue check and a platform decision. **T-COST-2** with every paid adapter off, the full Enquiry Mode path works (intake, ACK, drafting, approval, send on free channels).
+
+## 87. Texts only for paying customers (answers SMS costs)
+
+Before a tenant pays, Sevari uses only free channels: email, web forms, the chat widget and owner app notifications. SMS sending, SMS approvals and missed-call text-backs (§49–§51) are enabled per tenant only while that tenant has an active paid plan, and stay within the plan's text allowance (plan data, §47). When a tenant stops paying, texts stop and the free channels carry on (§5.2: customers are still acknowledged on every free channel).
+
+Test: **T-SMS-1** an SMS send, SMS approval or missed-call text for a tenant without an active paid plan is refused before any provider call, and a free-channel fallback is used where one exists.
+
+## 88. HIVE: Sevari's self-learning (names §31–§35)
+
+"HIVE" is the product name for governed self-learning (§31–§35, Phases 20–23). Nothing about its rules changes:
+- It learns from approvals, rejections, edits, outcomes and complaints.
+- It proposes changes, tests them offline and in shadow, and promotes them only through the human gate. Dan decides platform-level changes; each owner decides changes to their own business (§82).
+- It never creates facts, never changes the legal perimeter and never widens its own authority.
+- Cross-tenant learning (including a future product starting "pre-trained", vision C-7) uses only aggregated, anonymised statistics and owner-approved, de-identified phrasing (§31.4).
+
+## 89. The integration layer (CIL): connects to everything, depends on nothing
+
+From the vision (Architecture v2.3, §8): *external systems become tools that follow Sevari's rules, not dependencies Sevari relies on.*
+
+1. **One integration port**, with an adapter per platform. Each adapter declares its egress hosts, data scope, auth method, rate limits and ADR (§29, §69). Credentials are encrypted per tenant (§6.3) and never shown to a model.
+2. **Scope: all four categories, built in this order**, because each enables the next:
+   1. Calendars (Google, Microsoft 365/Outlook, CalDAV) for real availability and bookings.
+   2. Trade and field-service job software (for example Jobber, Tradify, ServiceM8, Fergus, Commusoft).
+   3. Accounting (Xero, QuickBooks, FreeAgent, Sage) for invoices and payment status (LEDGER).
+   4. CRM and helpdesk (HubSpot, Zendesk, Salesforce, Freshdesk, Pipedrive, Microsoft Dynamics).
+
+   More platforms are added as adapters (packs, §36.1), never as core changes.
+3. **Free to run (§86).** Each tenant connects its own account with that platform's own sign-in (OAuth or the tenant's API key), so the tenant's subscription with that platform carries any cost. Veylith uses free developer and partner programmes. A connector that needs a paid Veylith account stays off until §86.3 is met.
+4. **Sevari is always the master of** its own decisions, approvals, grounding, knowledge records (I5), consent and suppression, and audit trail.
+5. **For contacts, jobs and tickets, the owner chooses the master per data type.** In the other direction, a change arriving from the non-master system becomes a **proposal**, never a silent overwrite. Conflicts are shown to the owner as one decision (§30).
+6. **External data is untrusted input** (§36.3). It never becomes a fact Sevari tells a customer until the owner confirms it as a knowledge record (I5).
+7. **Every action Sevari takes in another platform** (create a ticket, book a calendar slot, raise an invoice) is an action class under approvals and autonomy (§7, INV-4) and goes through the outbox with reconciliation (§66).
+8. **Independence.**
+   - Disconnecting or losing any integration never stops Enquiry Mode: work queues, the owner is told, and nothing is lost.
+   - Export is always available in open formats (§21).
+   - No platform's terms may be accepted if they would claim ownership of tenant data or restrict the tenant leaving. The ADR checks this.
+
+Tests:
+- **F59** data from an integration never reaches a customer as a fact without owner confirmation.
+- **F60** with every integration disconnected, Enquiry Mode runs end to end and the owner is notified.
+- **F61** an action in an external platform without a valid approval or grant is refused.
+- **F62** a change from the non-master system creates a proposal; nothing is overwritten.
+- **F63** integration credentials never appear in prompts, logs or audit payloads.
+
+## 90. Self-improving knowledge
+
+Knowledge stays owner-confirmed (I5). What improves itself is how quickly gaps are found and closed:
+1. **Gap detection.** The same UNKNOWN (§5.4) arising repeatedly across enquiries becomes **one** question to the owner (§30, acknowledged per §74). The answer becomes a knowledge record after the owner confirms it.
+2. **Freshness.** Each record type has a review age (config; for example prices every 90 days). Sevari asks the owner to reconfirm. Nothing is changed or expired automatically, but an out-of-date price is marked so replies say "we'll confirm" until it is reconfirmed.
+3. **Cross-checks.** Where an integration, the owner's own website (fetched by the free fetcher, §91.3) or a public register (R-20) disagrees with a knowledge record, Sevari raises a proposal for the owner. Sources are recorded on the proposal.
+4. **Learning feed.** Approved answers, edits and new records feed HIVE (§88) under §31's rules.
+
+Tests:
+- **T-KNOW-1** repeated identical unknowns produce one owner question, not many.
+- **T-KNOW-2** a stale price is never used as a confirmed fact, and is never changed without the owner.
+- **T-KNOW-3** a disagreeing external source creates a proposal and never edits a record.
+
+## 91. Growth: Sevari finds its own customers, free to run
+
+All within D3 (inbound and opt-in only) and §86 (no running cost).
+
+1. **"How fast do you reply?" free check.**
+   - The owner verifies a business email address (a code sent to it) or their website (a code they add). Then they tick a consent box and Sevari sends **one** realistic test enquiry to that verified address.
+   - Sevari times the reply. It reports the time and what Sevari would have replied, grounded only in facts from the owner's own public website; anything not on it says "we'd ask you".
+   - The test message carries a reference shown in the report.
+   - Marketing follow-up needs a separate, unticked-by-default consent.
+   - The fetched page and the test message are deleted after a short period (config, default 30 days). The timing and report are kept with the lead record.
+2. **Referrals that only pay out on payment.**
+   - Each paying tenant gets a referral link. The reward ("give a month, get a month", plan data) is granted only after the referred business has made its second successful payment.
+   - Rewards are LEDGER entries with the usual approval rules.
+   - An optional "Powered by Sevari" link on tenant forms is offered for a discount and measured. It is dropped if it doesn't convert.
+3. **The free web fetcher** is its own isolated service with its own allowlist mode:
+   - It fetches only verified domains, respects robots.txt and rate limits, and keeps no cookies.
+   - It runs with no database credentials for tenant data and has its own ADR.
+   - INV-3 still holds: a completed verification creates a time-limited allowlist entry for that one domain in the fetcher's own isolated egress policy. That entry is the only thing that lets it reach the domain, and it expires (default 30 days).
+4. A free "never miss an enquiry" plan is **not** offered until revenue data shows it pays for itself (§86).
+
+Tests:
+- **T-GROW-1** the check can't be run against an unverified address or domain.
+- **T-GROW-2** a referral reward is never granted before the referred tenant's second payment.
+- **T-GROW-3** the fetcher can't reach a domain without a verification record and has no access to tenant data.
+- **T-GROW-4** no marketing message goes to a check user without the separate consent.
+
+## 92. Phases for Part M
+
+| Phase | Scope | Exit |
+|---|---|---|
+| M1 | Cost gate (§86), texts-only-for-paying (§87) | T-COST-1, T-COST-2, T-SMS-1 green |
+| M2 | Integration port and the four categories in order (§89) | F59–F63 green; each connector's ADR approved by Dan |
+| M3 | Self-improving knowledge (§90), after Phases 18 and 20 | T-KNOW-1..3 green |
+| M4 | Growth (§91), after Phases 11 and 13 | T-GROW-1..4 green |
 
 ---
 

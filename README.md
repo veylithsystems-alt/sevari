@@ -2,13 +2,13 @@
 
 The operations layer for service businesses: it takes in every enquiry, works out what's true, replies, books, bills and keeps the records. It automates everything that can lawfully be automated, and hands everything else to a human with the facts already gathered.
 
-Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md) (v1.12). If the code and the contract disagree, the code is wrong or the contract needs amending.
+Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md) (v1.13). If the code and the contract disagree, the code is wrong or the contract needs amending.
 
 ---
 
 ## For Dan: where things stand (plain English)
 
-**Last updated:** 14 October 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.12
+**Last updated:** 14 October 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.13
 
 **Status: build in progress.** Under contract Part J there are three separate milestones: *build-complete* (code and tests done), *production-approved* (deployment, recovery, security, support, legal documents all proven: [`docs/readiness/`](docs/readiness/README.md)), and *commercially launched* (pilots prove the product is worth paying for: the Value Gate). Passing automated tests is **not** evidence that Sevari is ready for paying customers.
 
@@ -48,6 +48,12 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 - You decide product and build exceptions; each business owner decides their own, and can add their own team members with their own logins. Silence still never approves, and Veylith never approves for a business.
 - Sevari is for any service business, not one type: onboarding builds a pack for each new kind of business, which the owner confirms. Sevari finds its own customers within the law: answering Veylith's own enquiries, approved content, opted-in leads. Cold outreach stays off until a lawyer signs off.
 - FORGE (the code agent) is deferred until there's a GPU server.
+- **Free to run until Sevari earns money** (Part M): every paid service has a free option used by default, and the paid one is switched on only when revenue covers it and you approve. The only fixed cost is the server (about £31 a month).
+- **Texts are for paying customers only.** Before that, everything runs on free channels: email, web forms, the chat widget and phone-app notifications.
+- **HIVE** is the name for Sevari's self-learning. It's in the contract and comes in later phases. It proposes, tests, and only switches things on with approval (you for the product, the owner for their own business).
+- **Integrations (CIL)**: calendars, trade job software, accounting, then CRM and helpdesk (HubSpot, Zendesk and more), all planned. Each business connects its own account, so it's free for you. Sevari keeps its own records and keeps working if any of them disconnects.
+- **Self-improving knowledge**: questions Sevari can't answer become one question to the owner, old prices get re-checked, and disagreements with other systems become a proposal, never a silent change.
+- **Growth**: the free "How fast do you reply?" check, and referral rewards paid only after the new customer has paid twice.
 - How your original vision lines up with the contract: [`docs/reference/original-vision.md`](docs/reference/original-vision.md) §7.
 
 **Things I found that you should know:**
@@ -146,7 +152,7 @@ pnpm models:registry list|register|promote|retire   # owner role; promotion need
 Run `pnpm contract:status` for the live table. After Phase 5: F1 (database and API), F3 (grounding, property-based), F3H (holdout harness; starter cases only, DEV-009), F7 (ACK latency), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LLM, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
 
 ### Documents
-- [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md): the binding contract (v1.12)
+- [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md): the binding contract (v1.13)
 - [`docs/ops/model-benchmark.md`](docs/ops/model-benchmark.md): how to benchmark and switch on a model on the VPS
 - [`docs/CONTRACT_REVIEW.md`](docs/CONTRACT_REVIEW.md): proposed amendments
 - [`docs/readiness/README.md`](docs/readiness/README.md): Production Readiness and Value Gate tracker
