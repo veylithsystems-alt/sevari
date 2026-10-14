@@ -1,0 +1,107 @@
+/**
+ * Owner app API (§7.1, §30, §74, §82). Every route needs a credential:
+ *   /v1/owner/*      a tenant user credential. Operator credentials are refused (F58).
+ *   /v1/platform/*   an operator credential. Tenant credentials are refused and audited (F56).
+ * Answers are acknowledged in the response itself (the in-app channel, §74.1) and in the inbox.
+ */
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { z } from 'zod';
+import type { Clock } from '@sevari/clock';
+import type { TenantKeyring } from '@sevari/crypto';
+import { withTenant, type Db } from '@sevari/db';
+import { answer, type ConsumerRegistry } from '@sevari/hitl';
+import { authenticate, platformDecision, type Credential } from '@sevari/identity';
+
+export interface OwnerDeps {
+  readonly db: Db;
+  readonly keyring: TenantKeyring;
+  readonly clock: Clock;
+  readonly consumers: ConsumerRegistry;
+}
+
+const AnswerBody = z.object({
+  response: z.string().min(1).max(40),
+  digest: z.string().regex(/^[0-9a-f]{64}$/),
+  detail: z.string().max(4_000).optional(),
+}).strict();
+const DecisionBody = z.object({ decision: z.string().min(3).max(80), subject_ref: z.string().min(3).max(200), reason: z.string().min(3).max(500) }).strict();
+
+const bearer = (req: FastifyRequest) => /^Bearer (.+)$/.exec(req.headers.authorization ?? '')?.[1];
+const json = (req: FastifyRequest): unknown => {
+  try {
+    return JSON.parse(Buffer.isBuffer(req.body) ? req.body.toString('utf8') : '{}');
+  } catch {
+    return null;
+  }
+};
+
+export function registerOwnerRoutes(app: FastifyInstance, deps: OwnerDeps): void {
+  const userOnly = async (req: FastifyRequest, reply: FastifyReply): Promise<Extract<Credential, { kind: 'user' }> | null> => {
+    const cred = await authenticate(deps.db, deps.clock, bearer(req));
+    if (!cred) {
+      await reply.code(401).send({ error: 'sign in required' });
+      return null;
+    }
+    if (cred.kind !== 'user') {
+      // F58: Veylith never approves or acts on a tenant's behalf.
+      await reply.code(403).send({ error: 'operator credentials cannot act for a business' });
+      return null;
+    }
+    return cred;
+  };
+  const open = (tx: Parameters<Parameters<typeof withTenant>[2]>[0], table: string, column: string, rowId: string, enc: Buffer) => deps.keyring.openText(tx, { table, column, rowId }, enc);
+
+  app.get('/v1/owner/inbox', async (req, reply) => {
+    const cred = await userOnly(req, reply);
+    if (!cred) return reply;
+    return withTenant(deps.db, cred.scope, async (tx) => {
+      const qs = await tx.selectFrom('human_questions').selectAll().where('status', '=', 'open')
+        .$if(cred.role !== 'owner', (q) => q.where('assigned_user_id', '=', cred.userId)).orderBy('presented_at').limit(100).execute();
+      const ns = await tx.selectFrom('human_notifications').select(['id', 'kind', 'ref', 'body_enc', 'status', 'created_at'])
+        .where('user_id', '=', cred.userId).orderBy('created_at', 'desc').limit(100).execute();
+      return {
+        role: cred.role,
+        questions: await Promise.all(qs.map(async (q) => ({
+          id: q.id, kind: q.kind, digest: q.content_digest.toString('hex'), options: q.options, deadline: q.deadline_at.toISOString(),
+          safe_default: q.safe_default, assigned_to_me: q.assigned_user_id === cred.userId,
+          body: JSON.parse(await open(tx, 'human_questions', 'body_enc', q.id, q.body_enc)) as unknown,
+        }))),
+        notifications: await Promise.all(ns.map(async (n) => ({ id: n.id, kind: n.kind, ref: n.ref, status: n.status, at: n.created_at.toISOString(), text: await open(tx, 'human_notifications', 'body_enc', n.id, n.body_enc) }))),
+      };
+    });
+  });
+
+  app.post<{ Params: { id: string } }>('/v1/owner/questions/:id/answer', async (req, reply) => {
+    const cred = await userOnly(req, reply);
+    if (!cred) return reply;
+    const body = AnswerBody.safeParse(json(req));
+    if (!body.success || !/^[0-9a-f-]{36}$/.test(req.params.id)) return reply.code(400).send({ error: 'bad request' });
+    const r = await withTenant(deps.db, cred.scope, (tx) => answer({ keyring: deps.keyring, clock: deps.clock, consumers: deps.consumers }, tx, {
+      questionId: req.params.id, responderId: cred.userId, response: body.data.response, digestSeen: body.data.digest, channel: 'app',
+      ...(body.data.detail ? { detail: body.data.detail } : {}),
+    }));
+    return reply.code(r.accepted ? 200 : 409).send(r.accepted ? { accepted: true, ack: r.ack, ...(r.outcome ? { outcome: r.outcome } : {}) } : { accepted: false, reason: r.reason, ack: r.ack });
+  });
+
+  app.post<{ Params: { id: string } }>('/v1/owner/notifications/:id/read', async (req, reply) => {
+    const cred = await userOnly(req, reply);
+    if (!cred) return reply;
+    if (!/^[0-9a-f-]{36}$/.test(req.params.id)) return reply.code(400).send({ error: 'bad request' });
+    await withTenant(deps.db, cred.scope, (tx) => tx.updateTable('human_notifications').set({ status: 'read', read_at: new Date(deps.clock.nowMs()) })
+      .where('id', '=', req.params.id).where('user_id', '=', cred.userId).execute());
+    return reply.code(204).send();
+  });
+
+  app.post('/v1/platform/decisions', async (req, reply) => {
+    const cred = await authenticate(deps.db, deps.clock, bearer(req));
+    if (!cred) return reply.code(401).send({ error: 'sign in required' });
+    const body = DecisionBody.safeParse(json(req));
+    if (!body.success) return reply.code(400).send({ error: 'bad request' });
+    try {
+      const id = await platformDecision(deps.db, cred, { decision: body.data.decision, subjectRef: body.data.subject_ref, reason: body.data.reason });
+      return reply.code(201).send({ id });
+    } catch {
+      return reply.code(403).send({ error: 'platform decisions need a platform operator credential' });
+    }
+  });
+}

@@ -6,8 +6,8 @@
 import { smsEncoding } from './sms.ts';
 
 export type TemplateChannel = 'email' | 'sms' | 'webform' | 'api';
-export type TemplateId = 'ack' | 'safety' | 'holding' | 'clarify';
-export const TEMPLATE_VERSION = 'tpl-0.4.0';
+export type TemplateId = 'ack' | 'safety' | 'holding' | 'clarify' | 'reply' | 'holding_update';
+export const TEMPLATE_VERSION = 'tpl-0.5.0';
 
 export interface TemplateValues {
   readonly business: string;
@@ -17,6 +17,8 @@ export interface TemplateValues {
   readonly discloseAutomation: boolean;
   readonly safetyMessage?: string;
   readonly question?: string;
+  /** For 'reply': sentences built by the deterministic core (replySections). */
+  readonly sections?: readonly string[];
 }
 
 export type RenderResult =
@@ -33,11 +35,13 @@ export function render(id: TemplateId, channel: TemplateChannel, v: TemplateValu
   }
   if (id === 'safety' && !v.safetyMessage) return { ok: false, reason: 'missing value: safetyMessage' };
   if (id === 'clarify' && !v.question) return { ok: false, reason: 'missing value: question' };
+  if (id === 'reply' && !v.sections?.length) return { ok: false, reason: 'missing value: sections' };
   const sms = channel === 'sms';
   if (sms && v.business.length > MAX_BUSINESS_SMS) return { ok: false, reason: `business name longer than ${MAX_BUSINESS_SMS} characters for SMS` };
   const auto = v.discloseAutomation ? (sms ? ' This is an automatic reply.' : ' This is an automatic reply.') : '';
   const optOut = sms ? ' Reply STOP to opt out.' : '';
-  const privacy = sms ? ` Privacy: ${v.privacyUrl}` : `\n\nHow we use your information: ${v.privacyUrl}`;
+  // The privacy link goes with the first message (the acknowledgement); replies don't repeat it.
+  const privacy = id === 'reply' || id === 'holding_update' || id === 'clarify' ? '' : sms ? ` Privacy: ${v.privacyUrl}` : `\n\nHow we use your information: ${v.privacyUrl}`;
   const greet = sms ? '' : 'Hello,\n\n';
   const sign = sms ? '' : `\n\n${v.business}`;
 
@@ -58,6 +62,16 @@ export function render(id: TemplateId, channel: TemplateChannel, v: TemplateValu
       break;
     case 'clarify':
       body = sms ? `${v.business}: ${v.question}${auto}` : `${greet}${v.question}${auto}`;
+      break;
+    case 'reply': {
+      const text = (v.sections ?? []).join(' ');
+      body = sms ? `${v.business}: ${text}${auto}` : `${greet}Thanks for your message.\n\n${(v.sections ?? []).join('\n\n')}${auto}`;
+      break;
+    }
+    case 'holding_update':
+      body = sms
+        ? `${v.business}: thanks for waiting. We are still looking at your enquiry and a member of the team will be in touch shortly.${auto}`
+        : `${greet}Thank you for waiting. We are still looking at your enquiry and a member of the team will be in touch shortly.${auto}`;
       break;
   }
   const text = `${body}${optOut}${privacy}${sign}`.replace(/[‘’]/g, "'").replace(/[“”]/g, '"');

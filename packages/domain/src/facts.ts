@@ -59,3 +59,33 @@ export function factsBundle(a: EnquiryAnalysis, k: KnowledgeSnapshot): FactsBund
   if (a.factsMissing.length) facts['team_will_confirm'] = a.factsMissing.map((m) => m.replace(/^knowledge:/, '').replace(/[:_]/g, ' '));
   return { facts, texts, ids: a.factsUsed, services };
 }
+
+/**
+ * The deterministic reply (§5.3: templates by default). Plain sentences built only from the analysis and
+ * the bundle, so every claim in them is supported by construction; grounding still checks them.
+ * Wording avoids commitments (no "confirmed", "guaranteed", "same day"): offering windows is not booking.
+ */
+export function replySections(a: EnquiryAnalysis, k: KnowledgeSnapshot): string[] {
+  const out: string[] = [];
+  const name = (code: string) => k.services.find((s) => s.body.code === code)?.body.name ?? code.replace(/_/g, ' ');
+  const service = a.services[0];
+  if (a.intent.intent === 'thanks') return ['Thank you for your message.'];
+  if (a.price?.kind === 'known') {
+    const what = name(a.price.serviceCode);
+    out.push(`${capitalise(what)}: ${a.price.statement}.`);
+  }
+  if (a.windows?.length) {
+    // Group by day: "Friday 16 October 2026 at 08:00–10:00 or 10:00–12:00".
+    const days = new Map<string, string[]>();
+    for (const w of a.windows) days.set(w.date, [...(days.get(w.date) ?? []), `${w.start}–${w.end}`]);
+    const orList = (xs: readonly string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} or ${xs.at(-1)}` : xs[0] ?? '');
+    out.push(`We could come on ${orList([...days].map(([date, slots]) => `${longDate(date)} at ${orList(slots)}`))}.`);
+  }
+  for (const f of k.faqs.filter((f) => a.faqs.includes(`${f.id}@${f.version}`))) out.push(f.body.answer);
+  if (!out.length && service) out.push(`Yes, we can help with ${name(service)}.`);
+  const phone = k.business?.body.phone;
+  out.push(`If you would like to go ahead, just reply to this message${phone ? ` or call us on ${phone}` : ''}.`);
+  return out;
+}
+
+const capitalise = (s: string) => (s ? s[0]?.toUpperCase() + s.slice(1) : s);

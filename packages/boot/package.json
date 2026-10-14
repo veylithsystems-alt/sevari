@@ -3,13 +3,16 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "dependencies": {
     "@sevari/clock": "workspace:*",
     "@sevari/crypto": "workspace:*",
     "@sevari/db": "workspace:*",
     "@sevari/domain": "workspace:*",
     "@sevari/egress": "workspace:*",
+    "@sevari/identity": "workspace:*",
     "@sevari/privacy": "workspace:*",
     "@sevari/region": "workspace:*"
   }

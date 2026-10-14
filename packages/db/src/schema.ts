@@ -1,4 +1,4 @@
-import type { ColumnType, Generated } from 'kysely';
+import type { ColumnType, Generated, Selectable } from 'kysely';
 
 type Ts = ColumnType<Date, Date | string | undefined, never>;
 type Meta = { created_at: Ts; updated_at: Ts; version: ColumnType<number, never, never> };
@@ -16,6 +16,8 @@ export interface TenantsTable extends Meta {
   display_name: string;
   status: Generated<'prospect' | 'onboarding' | 'shadow' | 'active' | 'suspended' | 'offboarding' | 'closed'>;
   is_house: Generated<boolean>;
+  holding_update_enabled: Generated<boolean>;
+  reply_due_minutes: Generated<number>;
 }
 export interface TenantKeysTable extends Meta {
   id: Generated<string>;
@@ -54,7 +56,7 @@ export interface UsersTable extends Meta {
   id: Generated<string>;
   tenant_id: string;
   region: string;
-  role: 'owner' | 'staff' | 'delegate' | 'viewer';
+  role: 'owner' | 'approver' | 'viewer';
   display_name_enc: Buffer;
   email_enc: Buffer | null;
   email_bidx: Buffer | null;
@@ -269,6 +271,116 @@ export interface ReplyRecordsTable extends Meta {
   prompt_id: ColumnType<string | null, string | null | undefined, never>;
 }
 
+type Tenant = { id: Generated<string>; tenant_id: string; region: string };
+
+export interface UserPermissionsTable extends Meta, Tenant { user_id: string; action_class: string; granted_by: string; revoked_at: Date | null }
+export interface ApprovalRoutesTable extends Meta, Tenant { position: number; user_id: string; after_minutes: number }
+export interface UserTokensTable extends Meta, Tenant { user_id: string; prefix: string; token_hash: Buffer; status: Generated<'active' | 'revoked'>; expires_at: Date }
+export type OperatorRole = 'founder' | 'operator' | 'counsel';
+export interface PlatformDecisionsTable extends Meta { id: Generated<string>; operator_id: string; decision: string; subject_ref: string; reason: string; approver_role: OperatorRole; scope: string | null; expires_on: string | null }
+export interface OperatorsTable extends Meta { id: Generated<string>; display_name: string; prefix: string; token_hash: Buffer; role: Generated<OperatorRole>; status: Generated<'active' | 'revoked'> }
+export type DraftStatus = 'pending_approval' | 'approved' | 'rejected' | 'superseded' | 'expired' | 'sent' | 'failed' | 'blocked';
+export interface DraftsTable extends Meta, Tenant {
+  enquiry_id: string | null;
+  conversation_id: string;
+  contact_id: string;
+  in_reply_to: string | null;
+  parent_id: string | null;
+  draft_version: Generated<number>;
+  channel: 'email' | 'sms';
+  purpose: 'clarify' | 'reply' | 'holding';
+  action_class: string;
+  recipient_enc: Buffer;
+  body_enc: Buffer;
+  sources_enc: Buffer;
+  content_digest: Buffer;
+  generator: 'template' | 'model' | 'human';
+  template_id: string | null;
+  model_id: string | null;
+  facts_used: string[];
+  status: Generated<DraftStatus>;
+  outbox_id: string | null;
+}
+export interface ApprovalsTable extends Meta, Tenant {
+  draft_id: string;
+  action_class: string;
+  content_digest: Buffer;
+  approver_id: string;
+  input_id: string;
+  expires_at: Date;
+  consumed_at: Date | null;
+}
+export interface AutonomyGrantsTable extends Meta, Tenant {
+  action_class: string;
+  input_id: string;
+  granted_by: string;
+  evidence: ColumnType<Record<string, unknown>, string, never>;
+  revoked_at: Date | null;
+  revoke_reason: string | null;
+}
+export type QuestionKind = 'approve_draft' | 'clarify_edit' | 'owner_task' | 'autonomy_grant' | 'knowledge_update';
+export type SafeDefault = 'hold' | 'reask' | 'escalate' | 'fail_closed';
+export interface HumanQuestionsTable extends Meta, Tenant {
+  kind: QuestionKind;
+  subject_ref: string;
+  action_class: string | null;
+  content_digest: Buffer;
+  content_version: Generated<number>;
+  body_enc: Buffer;
+  options: string[];
+  safe_default: SafeDefault;
+  consumer_kind: string;
+  consumer_ref: string;
+  required_role: 'owner' | 'approver';
+  assigned_user_id: string | null;
+  escalation_level: Generated<number>;
+  next_escalation_at: Date | null;
+  reply_due_at: Date | null;
+  deadline_at: Date;
+  presented_at: Date;
+  clarifications: Generated<number>;
+  status: Generated<'open' | 'answered' | 'expired' | 'cancelled' | 'superseded'>;
+  closed_reason: string | null;
+}
+export type InputStatus = 'rejected' | 'pending_effect' | 'applied' | 'failed' | 'recorded';
+export interface HumanInputsTable extends Meta, Tenant {
+  question_id: string;
+  kind: string;
+  response: string;
+  detail_enc: Buffer | null;
+  response_digest: Buffer;
+  responder_id: string;
+  responder_role: string;
+  channel: 'app' | 'email' | 'sms' | 'api';
+  received_at: Date;
+  decision_ms: number | null;
+  rubber_stamp: Generated<boolean>;
+  status: InputStatus;
+  rejection_reason: string | null;
+  consumed_by: string | null;
+  effect_receipt_id: string | null;
+  effect_due_at: Date | null;
+  alerted_at: Date | null;
+}
+export interface EffectReceiptsTable extends Meta, Tenant {
+  input_id: string;
+  effect_kind: string;
+  effect_ref: string;
+  outcome: 'done' | 'failed';
+  detail: ColumnType<Record<string, unknown>, string | undefined, never>;
+}
+export type NotificationKind = 'question' | 'ack' | 'outcome' | 'failure' | 'escalation' | 'alert' | 'warning' | 'info';
+export interface HumanNotificationsTable extends Meta, Tenant {
+  user_id: string;
+  kind: NotificationKind;
+  ref: string;
+  dedupe_key: string;
+  body_enc: Buffer;
+  channel: Generated<'app' | 'email' | 'sms' | 'push'>;
+  status: Generated<'queued' | 'delivered' | 'read'>;
+  read_at: Date | null;
+}
+
 export interface Database {
   regions: RegionsTable;
   tenants: TenantsTable;
@@ -288,4 +400,19 @@ export interface Database {
   outbox: OutboxTable;
   reply_records: ReplyRecordsTable;
   model_registry: ModelRegistryTable;
+  user_permissions: UserPermissionsTable;
+  approval_routes: ApprovalRoutesTable;
+  user_tokens: UserTokensTable;
+  operators: OperatorsTable;
+  platform_decisions: PlatformDecisionsTable;
+  drafts: DraftsTable;
+  approvals: ApprovalsTable;
+  autonomy_grants: AutonomyGrantsTable;
+  human_questions: HumanQuestionsTable;
+  human_inputs: HumanInputsTable;
+  effect_receipts: EffectReceiptsTable;
+  human_notifications: HumanNotificationsTable;
 }
+
+export type QuestionRow = Selectable<HumanQuestionsTable>;
+export type DraftRow = Selectable<DraftsTable>;

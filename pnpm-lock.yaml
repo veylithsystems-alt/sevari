@@ -14,9 +14,15 @@ importers:
       '@sevari/api':
         specifier: workspace:*
         version: link:apps/api
+      '@sevari/approvals':
+        specifier: workspace:*
+        version: link:packages/approvals
       '@sevari/audit':
         specifier: workspace:*
         version: link:packages/audit
+      '@sevari/autonomy':
+        specifier: workspace:*
+        version: link:packages/autonomy
       '@sevari/boot':
         specifier: workspace:*
         version: link:packages/boot
@@ -41,6 +47,12 @@ importers:
       '@sevari/grounding':
         specifier: workspace:*
         version: link:packages/grounding
+      '@sevari/hitl':
+        specifier: workspace:*
+        version: link:packages/hitl
+      '@sevari/identity':
+        specifier: workspace:*
+        version: link:packages/identity
       '@sevari/intake':
         specifier: workspace:*
         version: link:packages/intake
@@ -128,9 +140,18 @@ importers:
       '@sevari/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@sevari/hitl':
+        specifier: workspace:*
+        version: link:../../packages/hitl
+      '@sevari/identity':
+        specifier: workspace:*
+        version: link:../../packages/identity
       '@sevari/intake':
         specifier: workspace:*
         version: link:../../packages/intake
+      '@sevari/worker':
+        specifier: workspace:*
+        version: link:../worker
       fastify:
         specifier: 5.6.2
         version: 5.6.2
@@ -140,9 +161,15 @@ importers:
 
   apps/worker:
     dependencies:
+      '@sevari/approvals':
+        specifier: workspace:*
+        version: link:../../packages/approvals
       '@sevari/audit':
         specifier: workspace:*
         version: link:../../packages/audit
+      '@sevari/autonomy':
+        specifier: workspace:*
+        version: link:../../packages/autonomy
       '@sevari/clock':
         specifier: workspace:*
         version: link:../../packages/clock
@@ -158,6 +185,9 @@ importers:
       '@sevari/grounding':
         specifier: workspace:*
         version: link:../../packages/grounding
+      '@sevari/hitl':
+        specifier: workspace:*
+        version: link:../../packages/hitl
       '@sevari/intake':
         specifier: workspace:*
         version: link:../../packages/intake
@@ -177,8 +207,32 @@ importers:
         specifier: workspace:*
         version: link:../../packages/verticals
 
+  packages/approvals:
+    dependencies:
+      '@sevari/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@sevari/db':
+        specifier: workspace:*
+        version: link:../db
+      '@sevari/domain':
+        specifier: workspace:*
+        version: link:../domain
+
   packages/audit:
     dependencies:
+      '@sevari/db':
+        specifier: workspace:*
+        version: link:../db
+      '@sevari/domain':
+        specifier: workspace:*
+        version: link:../domain
+
+  packages/autonomy:
+    dependencies:
+      '@sevari/audit':
+        specifier: workspace:*
+        version: link:../audit
       '@sevari/db':
         specifier: workspace:*
         version: link:../db
@@ -203,6 +257,9 @@ importers:
       '@sevari/egress':
         specifier: workspace:*
         version: link:../egress
+      '@sevari/identity':
+        specifier: workspace:*
+        version: link:../identity
       '@sevari/privacy':
         specifier: workspace:*
         version: link:../privacy
@@ -262,6 +319,39 @@ importers:
 
   packages/grounding:
     dependencies:
+      '@sevari/domain':
+        specifier: workspace:*
+        version: link:../domain
+
+  packages/hitl:
+    dependencies:
+      '@sevari/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@sevari/clock':
+        specifier: workspace:*
+        version: link:../clock
+      '@sevari/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@sevari/db':
+        specifier: workspace:*
+        version: link:../db
+      '@sevari/domain':
+        specifier: workspace:*
+        version: link:../domain
+
+  packages/identity:
+    dependencies:
+      '@sevari/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@sevari/clock':
+        specifier: workspace:*
+        version: link:../clock
+      '@sevari/db':
+        specifier: workspace:*
+        version: link:../db
       '@sevari/domain':
         specifier: workspace:*
         version: link:../domain

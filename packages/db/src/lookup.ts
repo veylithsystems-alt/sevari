@@ -52,3 +52,29 @@ export async function findApiKey(db: Db, prefix: string): Promise<ApiKeyRoute | 
     return { id: r.id, tenantId: tenantId(r.tenant_id), region: regionCode(r.region), keyHash: r.key_hash, scopes: r.scopes, expiresAt: r.expires_at };
   });
 }
+
+export interface UserTokenRoute {
+  readonly tenantId: TenantId;
+  readonly region: RegionCode;
+  readonly userId: string;
+  readonly tokenHash: Buffer;
+  readonly expiresAt: Date;
+}
+
+export async function findUserToken(db: Db, prefix: string): Promise<UserTokenRoute | null> {
+  if (!/^ut_[a-z0-9]{12}$/.test(prefix)) return null;
+  return db.transaction().execute(async (trx) => {
+    await sql`SELECT set_config('app.user_token_prefix', ${prefix}, true)`.execute(trx);
+    const r = await trx.selectFrom('user_tokens').select(['tenant_id', 'region', 'user_id', 'token_hash', 'expires_at']).where('prefix', '=', prefix).executeTakeFirst();
+    return r ? { tenantId: tenantId(r.tenant_id), region: regionCode(r.region), userId: r.user_id, tokenHash: r.token_hash, expiresAt: r.expires_at } : null;
+  });
+}
+
+export async function findOperator(db: Db, prefix: string): Promise<{ id: string; tokenHash: Buffer; role: 'founder' | 'operator' | 'counsel' } | null> {
+  if (!/^op_[a-z0-9]{12}$/.test(prefix)) return null;
+  return db.transaction().execute(async (trx) => {
+    await sql`SELECT set_config('app.operator_prefix', ${prefix}, true)`.execute(trx);
+    const r = await trx.selectFrom('operators').select(['id', 'token_hash', 'role']).where('prefix', '=', prefix).executeTakeFirst();
+    return r ? { id: r.id, tokenHash: r.token_hash, role: r.role } : null;
+  });
+}

@@ -4,6 +4,7 @@ import { crossCheck, hostsForCell, loadEgressPolicy, loadProcessorRegistry } fro
 import { join } from 'node:path';
 import type { Clock } from '@sevari/clock';
 import { registryGaps } from '@sevari/privacy';
+import { verifySignoff } from '@sevari/identity';
 import { loadRegionConfig } from '@sevari/region';
 
 export interface BootCheck {
@@ -76,6 +77,19 @@ export async function runBootChecks(deps: BootDeps): Promise<BootReport> {
     check('region.config', async () => {
       const cfg = await loadRegionConfig(deps.configDir, deps.region);
       return `${cfg.code}: counsel_signoff ${cfg.counsel_signoff ? 'recorded' : 'NULL (no live tenants)'}`;
+    }),
+    check('signoffs', async () => {
+      // §71: a sign-off in configuration must be backed by approval records (counsel and founder, unexpired).
+      const cfg = await loadRegionConfig(deps.configDir, deps.region);
+      if (!cfg.counsel_signoff) return `${cfg.code}: no sign-off claimed`;
+      const today = deps.clock.now().toISOString().slice(0, 10);
+      const problems: string[] = [];
+      for (const scope of cfg.counsel_signoff.scope) {
+        const v = await verifySignoff(deps.db, `region:${cfg.code}:${scope}`, today);
+        if (!v.ok) problems.push(v.reason);
+      }
+      if (problems.length) throw new Error(`configuration claims a sign-off that the records don't support: ${problems.join('; ')}`);
+      return `${cfg.code}: ${cfg.counsel_signoff.scope.length} sign-off scope(s) backed by approval records`;
     }),
     check('registry.erasure', async () => {
       if (!tables) throw new Error('cannot read schema');
