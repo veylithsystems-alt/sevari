@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+.local/
+eval/reports/*.tmp.md
+.stryker-tmp/
+reports/
+eval/reports/ci.md

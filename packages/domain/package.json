@@ -1,0 +1,8 @@
+{
+  "name": "@sevari/domain",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {"zod": "3.25.76"}
+}

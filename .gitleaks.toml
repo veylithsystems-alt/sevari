@@ -1,0 +1,16 @@
+# INV-10 / T-SEC: no production secret in the repo. CI runs gitleaks on every push and PR.
+title = "sevari-core gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test-only throwaway credentials and documentation examples"
+paths = [
+  '''docs/reference/raw/.*\.json''',
+]
+regexes = [
+  '''owner_test_only''',
+  '''app_test_only''',
+  '''worker_test_only''',
+]

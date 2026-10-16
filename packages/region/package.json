@@ -1,0 +1,12 @@
+{
+  "name": "@sevari/region",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@sevari/domain": "workspace:*",
+    "yaml": "2.8.1",
+    "zod": "3.25.76"
+  }
+}

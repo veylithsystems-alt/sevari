@@ -1,0 +1,33 @@
+#!/usr/sbin/nft -f
+# Sevari cell egress firewall (contract INV-3, §36.3, §60.1).
+# Outbound traffic is dropped by default. Only the egress-proxy service user may open connections
+# leaving the host, and only to HTTPS and DNS. Everything else (the API, workers, a compromised
+# dependency) can reach only loopback, where the proxy enforces the hostname allowlist.
+#
+# Deployment fills in the defines (see ops/runbooks/egress.md). The test in
+# tests/phase2/f2-egress.test.ts loads this exact file into an isolated network namespace.
+
+define PROXY_UID = 990
+define DNS_RESOLVERS = { 127.0.0.53 }
+
+table inet sevari_egress
+delete table inet sevari_egress
+
+table inet sevari_egress {
+  counter proxy_https { }
+  counter proxy_dns { }
+  counter dropped { }
+
+  chain output {
+    type filter hook output priority filter; policy drop;
+
+    oif "lo" accept
+    ct state established,related accept
+
+    meta skuid $PROXY_UID tcp dport 443 counter name proxy_https accept
+    meta skuid $PROXY_UID udp dport 53 ip daddr $DNS_RESOLVERS counter name proxy_dns accept
+    meta skuid $PROXY_UID tcp dport 53 ip daddr $DNS_RESOLVERS counter name proxy_dns accept
+
+    counter name dropped log prefix "sevari-egress-drop " level warn drop
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@sevari/outbound",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@sevari/audit": "workspace:*",
+    "@sevari/clock": "workspace:*",
+    "@sevari/crypto": "workspace:*",
+    "@sevari/db": "workspace:*",
+    "@sevari/domain": "workspace:*",
+    "@sevari/grounding": "workspace:*"
+  }
+}

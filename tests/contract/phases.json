@@ -1,0 +1,13 @@
+{
+  "$comment": "Phases whose exit criteria are claimed met on this branch. The CI gate requires every contract test in these phases to pass. Dan confirms by merging.",
+  "delivered": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "18"
+  ]
+}

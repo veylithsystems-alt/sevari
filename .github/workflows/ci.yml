@@ -1,0 +1,75 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: secrets (gitleaks, INV-10)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: gitleaks
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz | tar -xz gitleaks
+          ./gitleaks detect --no-banner --redact --config .gitleaks.toml
+
+  gate:
+    name: contract gate (delivered phases must be green)
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: ci_only_password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      SEVARI_TEST_DATABASE_URL: postgres://postgres:ci_only_password@127.0.0.1:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: node scripts/secret-scan.ts
+      - run: pnpm test:gate
+      - run: pnpm -s register:generate --check
+      - name: Corpus quality must not drop more than 2 points (§10.3)
+        run: SEVARI_EVAL_DATE=ci node eval/run.ts --check
+      - name: F2 runtime firewall check (nftables in network namespaces)
+        run: |
+          sudo apt-get install -y -q nftables iproute2 util-linux >/dev/null
+          out=$(sudo bash ops/nftables/verify-in-netns.sh ops/nftables/sevari-egress.nft 12345 | tail -1)
+          echo "$out"
+          echo "$out" | python3 -c "import json,sys; r=json.load(sys.stdin); assert r['app_https']=='blocked' and r['proxy_https']=='ok' and r['proxy_smtp']=='blocked' and r['loopback']=='ok' and r['dropped_packets']>0, r"
+
+  contract-progress:
+    name: contract progress (every test, red included; informational)
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: ci_only_password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      SEVARI_TEST_DATABASE_URL: postgres://postgres:ci_only_password@127.0.0.1:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm contract:status
+      - run: pnpm test:all

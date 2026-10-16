@@ -1,0 +1,13 @@
+DROP TABLE IF EXISTS job_queue;
+DROP INDEX IF EXISTS contacts_email_unique;
+DROP INDEX IF EXISTS contacts_phone_unique;
+CREATE INDEX IF NOT EXISTS contacts_email_bidx ON contacts (tenant_id, email_bidx);
+CREATE INDEX IF NOT EXISTS contacts_phone_bidx ON contacts (tenant_id, phone_bidx);
+ALTER TABLE messages DROP CONSTRAINT IF EXISTS messages_endpoint_fk;
+ALTER TABLE messages DROP COLUMN IF EXISTS endpoint_id;
+ALTER TABLE messages DROP COLUMN IF EXISTS raw_enc;
+ALTER TABLE messages DROP COLUMN IF EXISTS subject_enc;
+ALTER TABLE messages DROP COLUMN IF EXISTS kind;
+DROP TABLE IF EXISTS api_keys;
+DROP TABLE IF EXISTS channel_endpoints;
+REVOKE ALL ON SCHEMA public, sevari_meta FROM sevari_worker;

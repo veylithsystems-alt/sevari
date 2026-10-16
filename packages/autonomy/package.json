@@ -1,0 +1,12 @@
+{
+  "name": "@sevari/autonomy",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@sevari/audit": "workspace:*",
+    "@sevari/db": "workspace:*",
+    "@sevari/domain": "workspace:*"
+  }
+}

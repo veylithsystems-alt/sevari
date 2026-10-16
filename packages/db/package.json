@@ -1,0 +1,12 @@
+{
+  "name": "@sevari/db",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts", "./admin": "./src/admin.ts" },
+  "dependencies": {
+    "@sevari/domain": "workspace:*",
+    "kysely": "0.28.8",
+    "pg": "8.16.3"
+  }
+}

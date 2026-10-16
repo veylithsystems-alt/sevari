@@ -1,0 +1,9 @@
+# Processor registry (contract §26, §29, §69). The source of truth for who processes data for Sevari.
+# An egress allowlist entry must reference an APPROVED processor here (T-PROC); a processor is not
+# approved until Dan's approval is recorded (an auditable human approval, §71).
+# docs/PROCESSOR_REGISTER.md is generated from this file and config/egress.allowlist.yaml.
+#
+# Nothing is approved yet. Candidates awaiting ADRs: Twilio (SMS, §57), the hosting provider (Q-10),
+# an email provider (§55.3), Stripe or alternative (§55.4).
+version: 1
+processors: []

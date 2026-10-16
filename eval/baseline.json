@@ -1,0 +1,11 @@
+{
+  "n": 100,
+  "intent": 89,
+  "route": 94,
+  "service": 98,
+  "outward": 100,
+  "urgency": 100,
+  "safety_recall": 100,
+  "human_recall": 100,
+  "abstain_rate": 16
+}

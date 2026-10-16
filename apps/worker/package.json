@@ -1,0 +1,26 @@
+{
+  "name": "@sevari/worker",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@sevari/approvals": "workspace:*",
+    "@sevari/audit": "workspace:*",
+    "@sevari/autonomy": "workspace:*",
+    "@sevari/clock": "workspace:*",
+    "@sevari/crypto": "workspace:*",
+    "@sevari/db": "workspace:*",
+    "@sevari/domain": "workspace:*",
+    "@sevari/grounding": "workspace:*",
+    "@sevari/hitl": "workspace:*",
+    "@sevari/intake": "workspace:*",
+    "@sevari/knowledge": "workspace:*",
+    "@sevari/llm": "workspace:*",
+    "@sevari/outbound": "workspace:*",
+    "@sevari/templates": "workspace:*",
+    "@sevari/verticals": "workspace:*"
+  }
+}

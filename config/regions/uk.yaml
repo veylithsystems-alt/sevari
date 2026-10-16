@@ -1,0 +1,22 @@
+# UK cell rule pack (§5.1, §8.4, §17.3, §36.4).
+# counsel_signoff stays null until counsel signs. While it is null, the cell refuses live tenants.
+# Claude Code never fills these in. Dan records counsel's sign-off with a date, a scope and an expiry.
+code: uk
+name: United Kingdom
+jurisdiction: GB
+timezone: Europe/London
+currency: GBP
+counsel_signoff: null
+signoff_expires_on: null
+messaging:
+  # §50.2(7): default permitted sending window for automatic texts, tenant-local time.
+  sending_window: { start: "07:30", end: "21:30" }
+outbound_rules:
+  # §17.1 / D3: only inbound (A) and opt-in (B) are enabled. C-F are built, disabled, and need counsel per region.
+  tiers_enabled: [A, B]
+  # §17.2 / F11: unknown and sole traders/partnerships are individuals under PECR (UK).
+  treat_as_individual: [unknown, individual, sole_trader, partnership]
+  preference_registers: [TPS, CTPS]
+retention_days:
+  # All H (hypothesis) until counsel confirms (§27.7). Used only for scheduling, never to delete early.
+  unanswered_call_events: 30
