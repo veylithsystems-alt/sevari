@@ -25,6 +25,8 @@ export const OUTBOX_DISPATCH_JOB = 'outbox.dispatch';
 export interface SendDeps {
   readonly keyring: TenantKeyring;
   readonly clock: Clock;
+  /** The cell's public origin, for links in messages (e.g. a data-copy download). */
+  readonly publicBaseUrl?: string;
 }
 
 export interface StoredSources {
@@ -63,9 +65,9 @@ export async function createDraft(deps: SendDeps, tx: TenantTx, d: NewDraft): Pr
     id, tenant_id: tx.scope.tenantId, region: tx.scope.region, enquiry_id: d.enquiryId, conversation_id: d.conversationId, contact_id: d.contactId,
     in_reply_to: d.inReplyTo, parent_id: d.parentId ?? null, ...(d.draftVersion ? { draft_version: d.draftVersion } : {}),
     channel: d.channel, purpose: d.purpose, action_class: d.actionClass,
-    recipient_enc: await deps.keyring.seal(tx, f('recipient_enc', id), recipient),
-    body_enc: await deps.keyring.seal(tx, f('body_enc', id), d.body),
-    sources_enc: await deps.keyring.seal(tx, f('sources_enc', id), JSON.stringify(d.sources)),
+    recipient_enc: await deps.keyring.seal(tx, { ...f('recipient_enc', id), subject: d.contactId }, recipient),
+    body_enc: await deps.keyring.seal(tx, { ...f('body_enc', id), subject: d.contactId }, d.body),
+    sources_enc: await deps.keyring.seal(tx, { ...f('sources_enc', id), subject: d.contactId }, JSON.stringify(d.sources)),
     content_digest: digest, generator: d.generator, template_id: d.templateId ?? null, model_id: d.modelId ?? null, facts_used: [...d.factsUsed],
   }).execute();
   await appendAudit(tx, { type: 'draft.created', actor: { kind: 'system' }, subject: `draft:${id}`, payload: { generator: d.generator, action_class: d.actionClass, purpose: d.purpose, facts_used: d.factsUsed.length, ...(d.parentId ? { parent: `draft:${d.parentId}` } : {}) } });
@@ -103,7 +105,7 @@ export type SendResult =
 /** Extra evidence a human supplied (their own edited or written text), cited by the input that carried it. */
 export interface OwnerFacts { readonly texts: readonly string[]; readonly ids: readonly string[] }
 
-export async function sendDraft(deps: SendDeps, tx: TenantTx, draftId: string, authority: Authority, owner?: OwnerFacts): Promise<SendResult> {
+export async function sendDraft(deps: SendDeps, tx: TenantTx, draftId: string, authority: Authority, owner?: OwnerFacts, opts: { readonly receiptByDispatch?: boolean } = {}): Promise<SendResult> {
   const d = await loadDraft(deps, tx, draftId, true);
   if (!d || d.row.status !== 'pending_approval') return { status: 'refused', reason: 'not_pending' };
   const setStatus = (status: DraftRow['status']) => tx.updateTable('drafts').set({ status }).where('id', '=', draftId).execute();
@@ -147,7 +149,7 @@ export async function sendDraft(deps: SendDeps, tx: TenantTx, draftId: string, a
     return { status: 'refused', reason: 'suppressed' };
   }
   await tx.updateTable('drafts').set({ status: 'approved', outbox_id: r.outboxId }).where('id', '=', draftId).execute();
-  await enqueue(tx, { kind: DISPATCH_JOB, dedupeKey: `dispatch:${draftId}`, payload: { draft_id: draftId, outbox_id: r.outboxId, input_id: authority.kind === 'approval' ? authority.inputId : null, grant_id: authority.kind === 'grant' ? authority.grantId : null } });
+  await enqueue(tx, { kind: DISPATCH_JOB, dedupeKey: `dispatch:${draftId}`, payload: { draft_id: draftId, outbox_id: r.outboxId, input_id: authority.kind === 'approval' && opts.receiptByDispatch !== false ? authority.inputId : null, grant_id: authority.kind === 'grant' ? authority.grantId : null } });
   await appendAudit(tx, { type: 'draft.authorised', actor: authority.kind === 'approval' ? { kind: 'user', ref: authority.approverId } : { kind: 'system', ref: `grant:${authority.grantId}` }, subject: `draft:${draftId}`, payload: { authority: authority.kind, outbox_ref: `outbox:${r.outboxId}` } });
   return { status: 'queued', outboxId: r.outboxId };
 }

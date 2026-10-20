@@ -88,7 +88,7 @@ async function persist(deps: IntakeDeps, tx: TenantTx, endpointId: string, lawfu
   const conversationId = await openConversation(tx, contactId);
 
   const messageId = randomUUID();
-  const field = (column: string) => ({ table: 'messages', column, rowId: messageId });
+  const field = (column: string) => ({ table: 'messages', column, rowId: messageId, subject: contactId });
   const inserted = await tx.insertInto('messages').values({
     id: messageId, tenant_id: tx.scope.tenantId, region: tx.scope.region, conversation_id: conversationId,
     direction: 'inbound', channel, kind: item.kind, provider_message_id: item.providerMessageId, endpoint_id: endpointId,
@@ -136,7 +136,7 @@ async function identifyContact(
   if (found) return found;
 
   const id = randomUUID();
-  const field = (column: string) => ({ table: 'contacts', column, rowId: id });
+  const field = (column: string) => ({ table: 'contacts', column, rowId: id, subject: id });
   // Provenance on every contact (§17.2, F10): where, on what basis, when and by what.
   const conflictTarget = emailIdx ? (['tenant_id', 'email_bidx'] as const) : (['tenant_id', 'phone_bidx'] as const);
   const created = await tx.insertInto('contacts').values({

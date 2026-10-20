@@ -6,7 +6,7 @@
 import { smsEncoding } from './sms.ts';
 
 export type TemplateChannel = 'email' | 'sms' | 'webform' | 'api';
-export type TemplateId = 'ack' | 'safety' | 'holding' | 'clarify' | 'reply' | 'holding_update';
+export type TemplateId = 'ack' | 'safety' | 'holding' | 'clarify' | 'reply' | 'holding_update' | 'dsar_ready' | 'erasure_done';
 export const TEMPLATE_VERSION = 'tpl-0.5.0';
 
 export interface TemplateValues {
@@ -19,6 +19,8 @@ export interface TemplateValues {
   readonly question?: string;
   /** For 'reply': sentences built by the deterministic core (replySections). */
   readonly sections?: readonly string[];
+  /** For 'dsar_ready': the one-time download link. */
+  readonly link?: string;
 }
 
 export type RenderResult =
@@ -36,12 +38,13 @@ export function render(id: TemplateId, channel: TemplateChannel, v: TemplateValu
   if (id === 'safety' && !v.safetyMessage) return { ok: false, reason: 'missing value: safetyMessage' };
   if (id === 'clarify' && !v.question) return { ok: false, reason: 'missing value: question' };
   if (id === 'reply' && !v.sections?.length) return { ok: false, reason: 'missing value: sections' };
+  if (id === 'dsar_ready' && !v.link) return { ok: false, reason: 'missing value: link' };
   const sms = channel === 'sms';
   if (sms && v.business.length > MAX_BUSINESS_SMS) return { ok: false, reason: `business name longer than ${MAX_BUSINESS_SMS} characters for SMS` };
   const auto = v.discloseAutomation ? (sms ? ' This is an automatic reply.' : ' This is an automatic reply.') : '';
   const optOut = sms ? ' Reply STOP to opt out.' : '';
   // The privacy link goes with the first message (the acknowledgement); replies don't repeat it.
-  const privacy = id === 'reply' || id === 'holding_update' || id === 'clarify' ? '' : sms ? ` Privacy: ${v.privacyUrl}` : `\n\nHow we use your information: ${v.privacyUrl}`;
+  const privacy = id === 'reply' || id === 'holding_update' || id === 'clarify' || id === 'erasure_done' ? '' : sms ? ` Privacy: ${v.privacyUrl}` : `\n\nHow we use your information: ${v.privacyUrl}`;
   const greet = sms ? '' : 'Hello,\n\n';
   const sign = sms ? '' : `\n\n${v.business}`;
 
@@ -68,6 +71,16 @@ export function render(id: TemplateId, channel: TemplateChannel, v: TemplateValu
       body = sms ? `${v.business}: ${text}${auto}` : `${greet}Thanks for your message.\n\n${(v.sections ?? []).join('\n\n')}${auto}`;
       break;
     }
+    case 'dsar_ready':
+      body = sms
+        ? `${v.business}: the copy of your information you asked for is ready: ${v.link} (works once, for 7 days).${auto}`
+        : `${greet}The copy of the information ${v.business} holds about you, which you asked for, is ready. You can download it once, within 7 days, here:\n\n${v.link}\n\nIf you did not ask for this, please tell us.${auto}`;
+      break;
+    case 'erasure_done':
+      body = sms
+        ? `${v.business}: as you asked, we have deleted the information we held about you.${auto}`
+        : `${greet}As you asked, ${v.business} has deleted the information we held about you. This is the last message you will receive from us about it.${auto}`;
+      break;
     case 'holding_update':
       body = sms
         ? `${v.business}: thanks for waiting. We are still looking at your enquiry and a member of the team will be in touch shortly.${auto}`

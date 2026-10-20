@@ -31,7 +31,7 @@ export interface InboundOptions {
 }
 
 interface InboundContext {
-  readonly msg: { id: string; conversation_id: string };
+  readonly msg: { id: string; conversation_id: string; contact_id: string };
   readonly text: string;
   readonly subject?: string;
   readonly fromName?: string;
@@ -83,7 +83,7 @@ export async function processInbound(deps: InboundDeps, tx: TenantTx, messageId:
     intent_model_id: a.intent.model?.modelId ?? null, intent_prompt_id: a.intent.model?.promptId ?? null,
     route: a.route, services: [...a.services], flags: [...a.flags], urgency: a.slots.urgency, eligibility: a.eligibility.overall,
     facts_used: [...a.factsUsed], facts_missing: [...a.factsMissing],
-    analysis_enc: await deps.keyring.seal(tx, { table: 'enquiries', column: 'analysis_enc', rowId: enquiryId }, JSON.stringify(a)),
+    analysis_enc: await deps.keyring.seal(tx, { table: 'enquiries', column: 'analysis_enc', rowId: enquiryId, subject: msg.contact_id }, JSON.stringify(a)),
     analysed_at: deps.clock.now(),
   }).execute();
   await enqueue(tx, { kind: RESPOND_JOB, dedupeKey: enquiryId, payload: { enquiry_id: enquiryId } });

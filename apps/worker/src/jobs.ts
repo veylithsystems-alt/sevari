@@ -17,7 +17,8 @@ import { completeEffect, SWEEP_JOB, sweep, type ConsumerRegistry } from '@sevari
 import { ACK_JOB, INBOUND_JOB } from '@sevari/intake';
 import { dispatch, reconcile, recordReply, type OutboundProvider } from '@sevari/outbound';
 import { sendAck } from './ack.ts';
-import { makeConsumers } from './consumers.ts';
+import { DSAR_ERASE_JOB, makeConsumers } from './consumers.ts';
+import { eraseSubject, type ShredRegister } from '@sevari/privacy';
 import { inboundHandler, RESPOND_JOB, type ModelDeps } from './inbound.ts';
 import { respond } from './respond.ts';
 import type { JobHandler } from './runner.ts';
@@ -29,12 +30,16 @@ export interface WorkerDeps {
   readonly clock: Clock;
   readonly provider: OutboundProvider;
   readonly model?: ModelDeps;
+  /** The cell's public origin, for links in messages. */
+  readonly publicBaseUrl?: string;
+  /** The shred register outside the database (§67). Required in production by the boot check. */
+  readonly shredRegister?: ShredRegister;
 }
 
 const RECONCILE_AFTER_MS = 60_000;
 
 export function workerHandlers(deps: WorkerDeps): { handlers: Record<string, JobHandler>; consumers: ConsumerRegistry } {
-  const consumers = makeConsumers({ keyring: deps.keyring, clock: deps.clock });
+  const consumers = makeConsumers({ keyring: deps.keyring, clock: deps.clock, ...(deps.publicBaseUrl ? { publicBaseUrl: deps.publicBaseUrl } : {}) });
   const hitl = { keyring: deps.keyring, clock: deps.clock, consumers };
 
   /** Records the outcome of a draft send on the draft, the reply record and the human's receipt (§74.2). */
@@ -85,6 +90,26 @@ export function workerHandlers(deps: WorkerDeps): { handlers: Record<string, Job
         const result = await dispatch(deps, scope, String(p['outbox_id']));
         if (result === 'in_progress') throw new Error('send in progress elsewhere; retry later');
         return result;
+      },
+    },
+    [DSAR_ERASE_JOB]: {
+      scoped: async (scope, p) => {
+        const dsarId = String(p['dsar_id']);
+        const outboxId = p['outbox_id'] ? String(p['outbox_id']) : null;
+        // Wait until the confirmation has gone (or failed for good): erasing first would erase the message too.
+        if (outboxId) {
+          // Send it now if it hasn't gone yet (dispatch is idempotent and lease-protected).
+          const r = await dispatch(deps, scope, outboxId);
+          if (r === 'in_progress') throw new Error('confirmation is being sent elsewhere; erase after it');
+          if (r === 'ambiguous') await reconcile(deps, scope, outboxId);
+        }
+        return withTenant(deps.db, scope, async (tx) => {
+          const cert = await eraseSubject({ keyring: deps.keyring, clock: deps.clock, ...(deps.shredRegister ? { register: deps.shredRegister } : {}) }, tx, String(p['contact_id']), 'dsar_erasure', `dsar:${dsarId}`);
+          await tx.updateTable('dsar_requests').set({ status: 'completed', outcome: 'erased', completed_at: deps.clock.now() }).where('id', '=', dsarId).execute();
+          const n = Object.values(cert.deleted).reduce((a, b) => a + b, 0);
+          if (p['input_id']) await completeEffect(hitl, tx, String(p['input_id']), { effectKind: 'subject.erased', effectRef: `dsar:${dsarId}`, outcome: 'done', text: `Done. Their information has been deleted (${n} records, and their encryption key destroyed, so no copy anywhere can be read). A certificate of erasure has been recorded.` });
+          return 'erased';
+        });
       },
     },
     [RECONCILE_JOB]: {

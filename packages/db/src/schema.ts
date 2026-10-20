@@ -318,7 +318,7 @@ export interface AutonomyGrantsTable extends Meta, Tenant {
   revoked_at: Date | null;
   revoke_reason: string | null;
 }
-export type QuestionKind = 'approve_draft' | 'clarify_edit' | 'owner_task' | 'autonomy_grant' | 'knowledge_update';
+export type QuestionKind = 'approve_draft' | 'clarify_edit' | 'owner_task' | 'autonomy_grant' | 'knowledge_update' | 'dsar_release';
 export type SafeDefault = 'hold' | 'reask' | 'escalate' | 'fail_closed';
 export interface HumanQuestionsTable extends Meta, Tenant {
   kind: QuestionKind;
@@ -341,6 +341,7 @@ export interface HumanQuestionsTable extends Meta, Tenant {
   clarifications: Generated<number>;
   status: Generated<'open' | 'answered' | 'expired' | 'cancelled' | 'superseded'>;
   closed_reason: string | null;
+  subject_contact_id: string | null;
 }
 export type InputStatus = 'rejected' | 'pending_effect' | 'applied' | 'failed' | 'recorded';
 export interface HumanInputsTable extends Meta, Tenant {
@@ -379,7 +380,49 @@ export interface HumanNotificationsTable extends Meta, Tenant {
   channel: Generated<'app' | 'email' | 'sms' | 'push'>;
   status: Generated<'queued' | 'delivered' | 'read'>;
   read_at: Date | null;
+  subject_contact_id: string | null;
 }
+
+export interface SubjectKeysTable extends Meta, Tenant { subject_ref: string; kek_id: string; wrapped_dek: Buffer | null; state: Generated<'active' | 'shredded'>; shredded_at: Date | null }
+export type DsarKind = 'access' | 'erasure' | 'rectification' | 'restriction' | 'objection' | 'portability' | 'unspecified';
+export interface DsarRequestsTable extends Meta, Tenant {
+  contact_id: string | null;
+  source_message_id: string | null;
+  kind: DsarKind;
+  identity: 'channel_verified' | 'owner_verified' | 'unverified';
+  received_at: Date;
+  due_at: Date;
+  status: Generated<'awaiting_release' | 'releasing' | 'completed' | 'refused' | 'withdrawn'>;
+  question_id: string | null;
+  export_enc: Buffer | null;
+  download_prefix: string | null;
+  download_hash: Buffer | null;
+  download_expires_at: Date | null;
+  downloaded_at: Date | null;
+  completed_at: Date | null;
+  outcome: string | null;
+}
+export type ConsentPurpose = 'marketing' | 'reminders' | 'review_requests' | 'updates' | 'partner_referral';
+export interface ConsentsTable extends Meta, Tenant {
+  contact_id: string;
+  purpose: ConsentPurpose;
+  channel: 'email' | 'sms' | 'all';
+  action: 'granted' | 'withdrawn';
+  basis: string;
+  source: string;
+  wording_version: string | null;
+  evidence_ref: string | null;
+  recorded_at: Date;
+}
+export interface ErasureLogTable extends Meta, Tenant {
+  subject_ref: string;
+  identifiers: Buffer[];
+  reason: 'dsar_erasure' | 'retention' | 'tenant_exit';
+  request_ref: string | null;
+  certificate: ColumnType<Record<string, unknown>, string, never>;
+  erased_at: Date;
+}
+export interface RetentionRunsTable extends Meta, Tenant { ran_at: Date; findings: ColumnType<Record<string, unknown>, string, never> }
 
 export interface Database {
   regions: RegionsTable;
@@ -405,6 +448,11 @@ export interface Database {
   user_tokens: UserTokensTable;
   operators: OperatorsTable;
   platform_decisions: PlatformDecisionsTable;
+  subject_keys: SubjectKeysTable;
+  dsar_requests: DsarRequestsTable;
+  consents: ConsentsTable;
+  erasure_log: ErasureLogTable;
+  retention_runs: RetentionRunsTable;
   drafts: DraftsTable;
   approvals: ApprovalsTable;
   autonomy_grants: AutonomyGrantsTable;

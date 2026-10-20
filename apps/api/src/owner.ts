@@ -13,6 +13,7 @@ import type { TenantKeyring } from '@sevari/crypto';
 import { withTenant, type Db } from '@sevari/db';
 import { answer, type ConsumerRegistry } from '@sevari/hitl';
 import { authenticate, platformDecision, type Credential } from '@sevari/identity';
+import { downloadCopy } from '@sevari/privacy';
 
 export interface OwnerDeps {
   readonly db: Db;
@@ -107,6 +108,15 @@ export function registerOwnerRoutes(app: FastifyInstance, deps: OwnerDeps): void
     await withTenant(deps.db, cred.scope, (tx) => tx.updateTable('human_notifications').set({ status: 'read', read_at: new Date(deps.clock.nowMs()) })
       .where('id', '=', req.params.id).where('user_id', '=', cred.userId).execute());
     return reply.code(204).send();
+  });
+
+  // A person's copy of their data (§21.2): one download, before expiry, through the link they were sent.
+  app.get<{ Params: { token: string } }>('/v1/dsar/:token', async (req, reply) => {
+    const r = await downloadCopy(deps.db, deps, req.params.token, withTenant);
+    if (r.status !== 'ok') {
+      return r.status === 'gone' ? reply.code(410).send({ error: 'This link has been used or has expired. Please ask the business for a new one.' }) : reply.code(404).send({ error: 'not found' });
+    }
+    return reply.type('application/json; charset=utf-8').header('content-disposition', 'attachment; filename="your-information.json"').send(r.body);
   });
 
   app.post('/v1/platform/decisions', async (req, reply) => {

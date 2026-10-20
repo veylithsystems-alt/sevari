@@ -62,6 +62,8 @@ export interface AskSpec {
   /** When the customer was promised a reply (§74.4 holding update). */
   readonly replyDueAt?: Date;
   readonly assignTo?: string;
+  /** The customer this question is about: its text is sealed with their key (erasure, §6.3). */
+  readonly subjectContactId?: string | null;
 }
 
 /** A consumer turns an accepted answer into an effect (INV-12). Registered by kind. */
@@ -108,13 +110,14 @@ export async function ask(deps: HitlDeps, tx: TenantTx, spec: AskSpec): Promise<
   const id = randomUUID();
   await tx.insertInto('human_questions').values({
     id, tenant_id: tx.scope.tenantId, region: tx.scope.region, kind: spec.kind, subject_ref: spec.subjectRef, action_class: spec.actionClass ?? null,
-    content_digest: spec.contentDigest, body_enc: await deps.keyring.seal(tx, field('body_enc', id), JSON.stringify(spec.body)),
+    content_digest: spec.contentDigest, body_enc: await deps.keyring.seal(tx, { ...field('body_enc', id), subject: spec.subjectContactId ?? null }, JSON.stringify(spec.body)),
+    subject_contact_id: spec.subjectContactId ?? null,
     options: [...spec.options], safe_default: spec.safeDefault, consumer_kind: spec.consumer.kind, consumer_ref: spec.consumer.ref,
     required_role: spec.requiredRole, assigned_user_id: assignee,
     next_escalation_at: firstRoute ? new Date(now + firstRoute.after_minutes * 60_000) : null,
     reply_due_at: spec.replyDueAt ?? null, deadline_at: new Date(now + spec.deadlineMs), presented_at: new Date(now),
   }).execute();
-  await notify(tx, deps.keyring, { userId: assignee, kind: 'question', ref: `question:${id}`, dedupeKey: `question:${id}:0`, text: `${spec.body.title}. ${spec.body.summary}` });
+  await notify(tx, deps.keyring, { userId: assignee, kind: 'question', ref: `question:${id}`, dedupeKey: `question:${id}:0`, text: `${spec.body.title}. ${spec.body.summary}`, subjectContactId: spec.subjectContactId ?? null });
   for (const at of [firstRoute ? now + firstRoute.after_minutes * 60_000 : null, spec.replyDueAt?.getTime() ?? null, now + spec.deadlineMs]) {
     if (at !== null) await scheduleSweep(tx, at);
   }
@@ -202,13 +205,13 @@ export async function answer(deps: HitlDeps, tx: TenantTx, a: AnswerInput): Prom
   return { accepted: true, inputId, ack: ackText, outcome: result.outcomeText };
 }
 
-async function recordInput(deps: HitlDeps, tx: TenantTx, q: { id: string; kind: string; presented_at: Date }, a: AnswerInput, role: string, nowMs: number,
+async function recordInput(deps: HitlDeps, tx: TenantTx, q: { id: string; kind: string; presented_at: Date; subject_contact_id: string | null }, a: AnswerInput, role: string, nowMs: number,
   s: { status: 'rejected' | 'pending_effect'; rejectionReason?: string; consumedBy?: string }): Promise<string> {
   const id = randomUUID();
   const decisionMs = Math.max(0, nowMs - q.presented_at.getTime());
   await tx.insertInto('human_inputs').values({
     id, tenant_id: tx.scope.tenantId, region: tx.scope.region, question_id: q.id, kind: q.kind, response: a.response.slice(0, 40),
-    detail_enc: a.detail ? await deps.keyring.seal(tx, { table: 'human_inputs', column: 'detail_enc', rowId: id }, a.detail) : null,
+    detail_enc: a.detail ? await deps.keyring.seal(tx, { table: 'human_inputs', column: 'detail_enc', rowId: id, subject: q.subject_contact_id }, a.detail) : null,
     response_digest: /^[0-9a-f]{64}$/.test(a.digestSeen) ? Buffer.from(a.digestSeen, 'hex') : Buffer.alloc(32),
     responder_id: a.responderId, responder_role: role, channel: a.channel, received_at: new Date(nowMs), decision_ms: decisionMs,
     rubber_stamp: s.status === 'pending_effect' && decisionMs < RUBBER_STAMP_MS, status: s.status,

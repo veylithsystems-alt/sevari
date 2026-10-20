@@ -4,5 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "exports": { ".": "./src/index.ts" },
-  "dependencies": { "@sevari/domain": "workspace:*" }
+  "dependencies": {
+    "@sevari/audit": "workspace:*",
+    "@sevari/clock": "workspace:*",
+    "@sevari/crypto": "workspace:*",
+    "@sevari/db": "workspace:*",
+    "@sevari/domain": "workspace:*"
+  }
 }

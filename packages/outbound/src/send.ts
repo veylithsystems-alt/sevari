@@ -69,8 +69,8 @@ export async function reserve(tx: TenantTx, keyring: TenantKeyring, clock: Clock
   await tx.insertInto('outbox').values({
     id, tenant_id: tx.scope.tenantId, region: tx.scope.region, conversation_id: input.conversationId, contact_id: input.contactId,
     in_reply_to: input.inReplyTo ?? null, channel: input.channel, purpose: input.draft.purpose, action_class: input.actionClass,
-    dedupe_key: input.dedupeKey, recipient_enc: await keyring.seal(tx, field('recipient_enc', id), to), recipient_bidx: bidx,
-    body_enc: await keyring.seal(tx, field('body_enc', id), bytes), body_digest: createHash('sha256').update(bytes).digest(),
+    dedupe_key: input.dedupeKey, recipient_enc: await keyring.seal(tx, { ...field('recipient_enc', id), subject: input.contactId }, to), recipient_bidx: bidx,
+    body_enc: await keyring.seal(tx, { ...field('body_enc', id), subject: input.contactId }, bytes), body_digest: createHash('sha256').update(bytes).digest(),
     template_id: input.templateId ?? null, template_version: input.templateVersion ?? null,
     reserved_at: clock.now(), ...(suppressed ? { state: 'blocked' as const, last_error: 'suppressed' } : {}),
   }).execute();

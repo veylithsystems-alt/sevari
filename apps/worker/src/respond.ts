@@ -13,6 +13,7 @@ import type { TenantTx } from '@sevari/db';
 import { factsBundle, replySections, type ActionClass, type EnquiryAnalysis } from '@sevari/domain';
 import { ground } from '@sevari/grounding';
 import { ask, digestOf, type ConsumerRegistry } from '@sevari/hitl';
+import { classifyRightsRequest, openDsar } from '@sevari/privacy';
 import { snapshotAt } from '@sevari/knowledge';
 import { recordReply } from '@sevari/outbound';
 import { render } from '@sevari/templates';
@@ -49,6 +50,7 @@ export async function respond(deps: RespondDeps, tx: TenantTx, enquiryId: string
   const replyDueAt = new Date(c.receivedAt + tenant.reply_due_minutes * 60_000);
 
   const ownerTask = (title: string, summary: string, facts: readonly string[] = []) => ask({ ...deps }, tx, {
+    subjectContactId: c.contactId,
     kind: 'owner_task', subjectRef: `enquiry:${enquiryId}`, contentDigest: digestOf({ enquiry: enquiryId, route: e.route, analysed_at: e.analysed_at.toISOString() }), requiredRole: 'owner',
     body: {
       title, summary, preview: c.text, facts,
@@ -57,6 +59,10 @@ export async function respond(deps: RespondDeps, tx: TenantTx, enquiryId: string
     options: ['reply', 'handled'], safeDefault: 'hold', consumer: { kind: 'owner.task', ref: enquiryId }, deadlineMs: APPROVAL_DEADLINE_MS,
   });
 
+  if (e.route === 'human_only' && (a.intent.intent === 'data_rights' || a.flags.includes('data_rights'))) {
+    await rightsRequest(deps, tx, enquiryId, c);
+    return { outcome: 'dsar_opened' };
+  }
   if (e.route === 'human_only') {
     await ownerTask('This one needs you', 'Sevari does not answer this kind of message by itself. The customer has had a holding reply.', a.flags.map((fl) => `Flag: ${fl.replace(/_/g, ' ')}`));
     return { outcome: 'owner_task' };
@@ -99,6 +105,7 @@ export async function respond(deps: RespondDeps, tx: TenantTx, enquiryId: string
     }
   }
   await ask({ ...deps }, tx, {
+    subjectContactId: c.contactId,
     kind: 'approve_draft', subjectRef: `draft:${draft.id}`, actionClass, contentDigest: draft.digest, requiredRole: 'approver',
     body: {
       title: purpose === 'clarify' ? 'Question for the customer, ready to approve' : 'Reply ready to approve',
@@ -120,6 +127,8 @@ export interface CustomerRef {
   readonly text: string;
   readonly channel: 'email' | 'sms' | null;
   readonly recipient: string | null;
+  /** The channel the message arrived on. */
+  readonly via: string;
 }
 
 /** Reply on the channel they used; forms and API go to email, or SMS when only a phone was given. */
@@ -134,6 +143,41 @@ export async function customerOf(deps: { keyring: TenantKeyring }, tx: TenantTx,
   const channel: 'email' | 'sms' | null = m.channel === 'sms' ? (phone ? 'sms' : null) : email ? 'email' : phone ? 'sms' : null;
   return {
     messageId: m.id, conversationId: m.conversation_id, contactId: m.contact_id, receivedAt: new Date(m.received_at).getTime(),
-    text: await open('messages', 'body_enc', m.id, m.body_enc), channel, recipient: channel === 'email' ? email : phone,
+    text: await open('messages', 'body_enc', m.id, m.body_enc), channel, recipient: channel === 'email' ? email : phone, via: m.channel,
   };
+}
+
+const KIND_TEXT: Record<string, string> = {
+  access: 'a copy of the information you hold about them',
+  portability: 'their information in a form they can take elsewhere',
+  erasure: 'their information to be deleted',
+  rectification: 'their details to be corrected',
+  objection: 'you to stop using their information for something',
+  restriction: 'you to limit how their information is used',
+  unspecified: 'something about their personal information (it isn\'t clear exactly what)',
+};
+
+/**
+ * A data-rights request (§21.2): opened with its legal clock, and put to the owner (the controller) to
+ * release. Sevari assembles and executes; the decision is human (§8.3). The customer already has the
+ * holding acknowledgement.
+ */
+async function rightsRequest(deps: RespondDeps, tx: TenantTx, enquiryId: string, c: CustomerRef): Promise<void> {
+  const kind = classifyRightsRequest(c.text);
+  const identity = c.via === 'email' || c.via === 'sms' ? 'channel_verified' as const : 'unverified' as const;
+  const d = await openDsar(tx, { contactId: c.contactId, sourceMessageId: c.messageId, kind, identity, receivedAt: new Date(c.receivedAt) });
+  const options = kind === 'access' || kind === 'portability' ? ['release', 'refuse'] : kind === 'erasure' ? ['erase', 'refuse'] : ['done', 'refuse'];
+  const labels: Record<string, string> = { release: 'Send them their copy', erase: 'Delete their information', done: 'I have dealt with it', refuse: 'Refuse (you must tell them why)' };
+  const q = await ask({ ...deps }, tx, {
+    subjectContactId: c.contactId, kind: 'dsar_release', subjectRef: `dsar:${d.id}`, contentDigest: digestOf({ dsar: d.id, kind }), requiredRole: 'owner',
+    body: {
+      title: 'A customer has asked about their personal information',
+      summary: `They have asked for ${KIND_TEXT[kind]}. The law gives you until ${d.dueAt.toISOString().slice(0, 10)} to respond.${identity === 'unverified' ? ' It came through your website form, so check it is really them before you act.' : ''}`,
+      preview: c.text, optionLabels: Object.fromEntries(options.map((o) => [o, labels[o] ?? o])),
+      safeDefaultText: 'Nothing is sent or deleted until you decide. You will be reminded before the deadline.',
+    },
+    options, safeDefault: 'escalate', consumer: { kind: 'dsar.release', ref: d.id }, deadlineMs: Math.max(60_000, d.dueAt.getTime() - deps.clock.nowMs()),
+    replyDueAt: new Date(d.dueAt.getTime() - 7 * 86_400_000),
+  });
+  await tx.updateTable('dsar_requests').set({ question_id: q }).where('id', '=', d.id).execute();
 }

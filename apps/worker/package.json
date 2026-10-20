@@ -20,6 +20,7 @@
     "@sevari/knowledge": "workspace:*",
     "@sevari/llm": "workspace:*",
     "@sevari/outbound": "workspace:*",
+    "@sevari/privacy": "workspace:*",
     "@sevari/templates": "workspace:*",
     "@sevari/verticals": "workspace:*"
   }

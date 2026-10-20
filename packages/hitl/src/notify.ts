@@ -9,6 +9,8 @@ export interface Notice {
   readonly ref: string;
   readonly dedupeKey: string;
   readonly text: string;
+  /** The person this notice is about, if any: its text is sealed with their key and goes with their erasure. */
+  readonly subjectContactId?: string | null;
 }
 
 export async function notify(tx: TenantTx, keyring: TenantKeyring, n: Notice): Promise<string | null> {
@@ -17,7 +19,8 @@ export async function notify(tx: TenantTx, keyring: TenantKeyring, n: Notice): P
   const id = randomUUID();
   await tx.insertInto('human_notifications').values({
     id, tenant_id: tx.scope.tenantId, region: tx.scope.region, user_id: n.userId, kind: n.kind, ref: n.ref, dedupe_key: n.dedupeKey,
-    body_enc: await keyring.seal(tx, { table: 'human_notifications', column: 'body_enc', rowId: id }, n.text),
+    body_enc: await keyring.seal(tx, { table: 'human_notifications', column: 'body_enc', rowId: id, subject: n.subjectContactId ?? null }, n.text),
+    subject_contact_id: n.subjectContactId ?? null,
   }).execute();
   return id;
 }

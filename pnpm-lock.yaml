@@ -149,6 +149,9 @@ importers:
       '@sevari/intake':
         specifier: workspace:*
         version: link:../../packages/intake
+      '@sevari/privacy':
+        specifier: workspace:*
+        version: link:../../packages/privacy
       '@sevari/worker':
         specifier: workspace:*
         version: link:../worker
@@ -200,6 +203,9 @@ importers:
       '@sevari/outbound':
         specifier: workspace:*
         version: link:../../packages/outbound
+      '@sevari/privacy':
+        specifier: workspace:*
+        version: link:../../packages/privacy
       '@sevari/templates':
         specifier: workspace:*
         version: link:../../packages/templates
@@ -442,6 +448,18 @@ importers:
 
   packages/privacy:
     dependencies:
+      '@sevari/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@sevari/clock':
+        specifier: workspace:*
+        version: link:../clock
+      '@sevari/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@sevari/db':
+        specifier: workspace:*
+        version: link:../db
       '@sevari/domain':
         specifier: workspace:*
         version: link:../domain

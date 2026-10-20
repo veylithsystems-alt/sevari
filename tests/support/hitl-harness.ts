@@ -66,7 +66,7 @@ export async function harness(region: string, seedByte: number, provider: FakePr
   const viewer = await user('viewer', 'Vic Viewer');
   const ep = await withTenant(h.db, t, (tx) => createEndpoint(tx, keyring, { channel: 'email', lawfulBasis: 'legitimate_interests_enquiry_response', purpose: 'enquiries' }, 'user:owner'));
   const intake: IntakeDeps = { db: h.db, keyring, clock, cellRegion: regionCode(region), cellUrls: {}, adapters: { email: signedWebhookAdapter('email'), webform: webformAdapter, sms: smsAdapter(FakeSmsProvider) } };
-  const deps = workerHandlers({ db: h.db, keyring, clock, provider });
+  const deps = workerHandlers({ db: h.db, keyring, clock, provider, publicBaseUrl: 'https://uk.sevari.example' });
   const queue = workerQueue(dbInfo().workerUrl, regionCode(region));
   const runner: RunnerDeps = { queue, db: h.db, clock, workerId: `w-${region}`, handlers: deps.handlers, concurrency: 1 };
   const hitl = { keyring, clock, consumers: deps.consumers };
