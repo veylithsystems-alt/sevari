@@ -19,6 +19,8 @@ import { dispatch, reconcile, recordReply, type OutboundProvider } from '@sevari
 import { sendAck } from './ack.ts';
 import { DSAR_ERASE_JOB, makeConsumers } from './consumers.ts';
 import { eraseSubject, type ShredRegister } from '@sevari/privacy';
+import { sendWeeklyReport, WEEKLY_REPORT_JOB } from '@sevari/metrics';
+import { snapshotAt } from '@sevari/knowledge';
 import { inboundHandler, RESPOND_JOB, type ModelDeps } from './inbound.ts';
 import { respond } from './respond.ts';
 import type { JobHandler } from './runner.ts';
@@ -70,6 +72,13 @@ export function workerHandlers(deps: WorkerDeps): { handlers: Record<string, Job
     [ACK_JOB]: { scoped: (scope, p) => sendAck(deps, scope, String(p['message_id'])) },
     [RESPOND_JOB]: (tx, p) => respond(hitl, tx, String(p['enquiry_id'])),
     [SWEEP_JOB]: (tx) => sweep(hitl, tx),
+    [WEEKLY_REPORT_JOB]: async (tx, p) => {
+      // Never report a week that hasn't finished, whatever the queue's timing says.
+      if (deps.clock.nowMs() < Number(p['period_end'])) throw new Error('week not finished yet');
+      const snap = await snapshotAt(tx, deps.keyring, deps.clock.nowMs());
+      const r = await sendWeeklyReport(deps, tx, Number(p['period_end']), snap.business?.body.trading_name ?? 'Your business');
+      return r ? 'sent' : 'already';
+    },
     [DISPATCH_JOB]: {
       scoped: async (scope, p) => {
         const outboxId = String(p['outbox_id']);

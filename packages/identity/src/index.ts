@@ -87,9 +87,9 @@ export async function platformDecision(db: Db, cred: Credential, d: PlatformDeci
  * A sign-off holds only when the approval records exist (§71): for legal scopes, two people, counsel AND
  * the founder (§30.5), each unexpired on `today`. A configuration field claiming a sign-off is not enough.
  */
-export async function verifySignoff(db: Db, scope: string, today: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+export async function verifySignoff(db: Db, scope: string, today: string, roles: readonly ('counsel' | 'founder')[] = ['counsel', 'founder']): Promise<{ ok: true } | { ok: false; reason: string }> {
   const rows = await db.selectFrom('platform_decisions').select(['approver_role', sql<string | null>`expires_on::text`.as('expires')]).where('decision', '=', 'signoff').where('scope', '=', scope).execute();
   const live = (role: string) => rows.some((r) => r.approver_role === role && r.expires !== null && r.expires > today);
-  const missing = ['counsel', 'founder'].filter((role) => !live(role));
+  const missing = roles.filter((role) => !live(role));
   return missing.length ? { ok: false, reason: `${scope}: no current sign-off record by ${missing.join(' and ')}` } : { ok: true };
 }

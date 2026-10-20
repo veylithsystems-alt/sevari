@@ -424,6 +424,22 @@ export interface ErasureLogTable extends Meta, Tenant {
 }
 export interface RetentionRunsTable extends Meta, Tenant { ran_at: Date; findings: ColumnType<Record<string, unknown>, string, never> }
 
+export interface OwnerReportsTable extends Meta, Tenant {
+  kind: 'weekly';
+  period_start: Date;
+  period_end: Date;
+  metrics: ColumnType<Record<string, unknown>, string, never>;
+  body_enc: Buffer;
+}
+type ViewOf<T> = { readonly [K in keyof T]: T[K] };
+export type MetricsEnquiryFlowView = ViewOf<{
+  tenant_id: string; region: string; enquiry_id: string; received_at: Date; analysed_at: Date; route: string; intent: string; intent_source: string; abstained: boolean;
+  ack_sent_at: Date | null; first_draft_at: Date | null; reply_sent_at: Date | null; edited: boolean; rejected: boolean; expired: boolean;
+}>;
+export type MetricsDecisionsView = ViewOf<{ tenant_id: string; region: string; received_at: Date; kind: string; response: string; status: string; decision_ms: number | null; rubber_stamp: boolean; responder_role: string }>;
+export type MetricsFloorView = ViewOf<{ tenant_id: string; region: string; outbox_id: string; sent_at: Date | null }>;
+export type MetricsUnknownsView = ViewOf<{ tenant_id: string; region: string; analysed_at: Date; missing: string }>;
+
 export interface Database {
   regions: RegionsTable;
   tenants: TenantsTable;
@@ -453,6 +469,12 @@ export interface Database {
   consents: ConsentsTable;
   erasure_log: ErasureLogTable;
   retention_runs: RetentionRunsTable;
+  owner_reports: OwnerReportsTable;
+  metrics_enquiry_flow: MetricsEnquiryFlowView;
+  metrics_decisions: MetricsDecisionsView;
+  metrics_floor_unauthorised_sends: MetricsFloorView;
+  metrics_floor_suppressed_sends: MetricsFloorView;
+  metrics_unknowns: MetricsUnknownsView;
   drafts: DraftsTable;
   approvals: ApprovalsTable;
   autonomy_grants: AutonomyGrantsTable;

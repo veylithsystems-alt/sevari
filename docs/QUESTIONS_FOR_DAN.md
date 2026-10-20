@@ -1,6 +1,6 @@
 # Questions for Dan
 
-Open decisions found while building. None of them block Phases 0–8. Each has a recommendation, so a one-word answer is enough. Details are in `docs/CONTRACT_REVIEW.md`.
+Open decisions found while building. None of them block Phases 0–9. Each has a recommendation, so a one-word answer is enough. Details are in `docs/CONTRACT_REVIEW.md`.
 
 | # | Question | Recommendation | Blocks |
 |---|---|---|---|
@@ -23,3 +23,4 @@ Open decisions found while building. None of them block Phases 0–8. Each has a
 | Q-17 | ✅ **Answered 14 Oct: Dan decides product/build exceptions; each business owner decides their own, with credentialed team members (§82).** Add trusted delegates who can approve when you can't (they tap approve; silence still never approves)? | Yes; you choose who and what they may approve; money stays yours unless you say otherwise (C-15) | Phase 18/6 |
 | Q-18 | ✅ **Answered 14 Oct: deferred (§84).** FORGE (code agent): keep in the Enterprise plan, defer, or drop? | Defer: not sold until there's a GPU and a clear use for service businesses (C-20) | Pricing copy, K6 |
 | Q-19 | Counsel: retention periods per record type, the backup window (proposal 35 days), and whether destroying a person's key meets erasure for backups | Ask counsel; until then retention only reports and deletes nothing | Phase 7 enforcement, PR-2 |
+| Q-20 | Service levels for the UK cell: availability target, how fast the service is back after an outage (RTO), how much recent data could be lost (RPO), how often backups run, and how a restore is proven | 99.5% availability; back within 4 hours; at most 24 hours of data lost, with daily backups; a monthly restore drill that re-applies erasures. Until you approve them (a founder record in the app), the cell runs but refuses live businesses | Live tenants (§70, T-SLO) |

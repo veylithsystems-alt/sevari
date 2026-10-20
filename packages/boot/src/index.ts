@@ -1,11 +1,11 @@
-import { currentRoleFacts, lintSchema, migrationState, piiColumns, tableSecurity, type Db } from '@sevari/db';
+import { currentRoleFacts, insecureViews, lintSchema, migrationState, piiColumns, tableSecurity, type Db } from '@sevari/db';
 import type { Kms } from '@sevari/crypto';
 import { crossCheck, hostsForCell, loadEgressPolicy, loadProcessorRegistry } from '@sevari/egress';
 import { join } from 'node:path';
 import type { Clock } from '@sevari/clock';
 import { registryGaps } from '@sevari/privacy';
 import { verifySignoff } from '@sevari/identity';
-import { loadRegionConfig } from '@sevari/region';
+import { liveTenantStatus, loadRegionConfig, loadSloConfig, sloApproved } from '@sevari/region';
 
 export interface BootCheck {
   readonly name: string;
@@ -53,7 +53,7 @@ export async function runBootChecks(deps: BootDeps): Promise<BootReport> {
     }),
     check('db.rls', async () => {
       if (!tables) throw new Error('cannot read schema');
-      const problems = lintSchema(tables);
+      const problems = [...lintSchema(tables), ...(await insecureViews(deps.db)).map((v) => `view ${v} is not security_invoker`)];
       if (problems.length) throw new Error(problems.join('; '));
       return `${tables.length} tables: RLS enabled and forced, tenancy columns present`;
     }),
@@ -91,6 +91,14 @@ export async function runBootChecks(deps: BootDeps): Promise<BootReport> {
       if (problems.length) throw new Error(`configuration claims a sign-off that the records don't support: ${problems.join('; ')}`);
       return `${cfg.code}: ${cfg.counsel_signoff.scope.length} sign-off scope(s) backed by approval records`;
     }),
+    check('slo', async () => {
+      // §70: service levels in configuration must be backed by Dan's approval record.
+      const slo = await loadSloConfig(deps.configDir);
+      if (!sloApproved(slo)) return 'service levels not approved yet: no live tenants';
+      const v = await verifySignoff(deps.db, `cell:${deps.region}:slo`, deps.clock.now().toISOString().slice(0, 10), ['founder']);
+      if (!v.ok) throw new Error(`configuration sets service levels that have no approval record: ${v.reason}`);
+      return `service levels approved (availability ${slo.availability_target_percent}%, RTO ${slo.rto_minutes} min, RPO ${slo.rpo_minutes} min)`;
+    }),
     check('registry.erasure', async () => {
       if (!tables) throw new Error('cannot read schema');
       const gaps = registryGaps(piiColumns(tables), tables.map((t) => t.table));
@@ -114,4 +122,27 @@ export async function assertBoot(deps: BootDeps): Promise<BootReport> {
   const report = await runBootChecks(deps);
   if (!report.ok) throw new BootRefused(report);
   return report;
+}
+
+/**
+ * Whether this cell may serve live (paying or piloting) tenants: counsel's sign-off AND approved service
+ * levels, each backed by its approval record (§8.4, §70, §71). Activation (Phase 11) calls this.
+ */
+export async function cellLiveStatus(deps: Pick<BootDeps, 'db' | 'configDir' | 'region' | 'clock'>): Promise<{ allowed: true } | { allowed: false; reasons: string[] }> {
+  const today = deps.clock.now().toISOString().slice(0, 10);
+  const reasons: string[] = [];
+  const region = await loadRegionConfig(deps.configDir, deps.region);
+  const legal = liveTenantStatus(region, today);
+  if (!legal.allowed) reasons.push(legal.reason);
+  else for (const scope of region.counsel_signoff?.scope ?? []) {
+    const v = await verifySignoff(deps.db, `region:${region.code}:${scope}`, today);
+    if (!v.ok) reasons.push(v.reason);
+  }
+  const slo = await loadSloConfig(deps.configDir);
+  if (!sloApproved(slo)) reasons.push('service levels (availability, RTO, RPO, backups) are not approved yet (§70)');
+  else {
+    const v = await verifySignoff(deps.db, `cell:${deps.region}:slo`, today, ['founder']);
+    if (!v.ok) reasons.push(v.reason);
+  }
+  return reasons.length ? { allowed: false, reasons } : { allowed: true };
 }

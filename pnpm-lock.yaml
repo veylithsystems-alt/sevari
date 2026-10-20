@@ -62,6 +62,9 @@ importers:
       '@sevari/llm':
         specifier: workspace:*
         version: link:packages/llm
+      '@sevari/metrics':
+        specifier: workspace:*
+        version: link:packages/metrics
       '@sevari/outbound':
         specifier: workspace:*
         version: link:packages/outbound
@@ -200,6 +203,9 @@ importers:
       '@sevari/llm':
         specifier: workspace:*
         version: link:../../packages/llm
+      '@sevari/metrics':
+        specifier: workspace:*
+        version: link:../../packages/metrics
       '@sevari/outbound':
         specifier: workspace:*
         version: link:../../packages/outbound
@@ -424,6 +430,24 @@ importers:
       zod:
         specifier: 3.25.76
         version: 3.25.76
+
+  packages/metrics:
+    dependencies:
+      '@sevari/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@sevari/clock':
+        specifier: workspace:*
+        version: link:../clock
+      '@sevari/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@sevari/db':
+        specifier: workspace:*
+        version: link:../db
+      '@sevari/hitl':
+        specifier: workspace:*
+        version: link:../hitl
 
   packages/outbound:
     dependencies:

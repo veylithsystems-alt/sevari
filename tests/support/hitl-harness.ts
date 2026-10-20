@@ -42,12 +42,12 @@ export interface Harness {
   close(): Promise<void>;
 }
 
-export async function harness(region: string, seedByte: number, provider: FakeProvider = new FakeProvider()): Promise<Harness> {
+export async function harness(region: string, seedByte: number, provider: FakeProvider = new FakeProvider(), trade = 'drainage'): Promise<Harness> {
   const clock = new FixedClock(Date.parse('2026-10-14T09:00:00Z'));
   const keyring = new TenantKeyring(LocalKeyFileKms.fromKey(Buffer.alloc(32, seedByte)));
   const h = appDb();
-  const t = await newTenant(h, region, 'Port Drains');
-  const k = KNOWLEDGE['drainage'];
+  const t = await newTenant(h, region, `Test ${trade}`);
+  const k = KNOWLEDGE[trade];
   if (!k) throw new Error('fixture missing');
   const user = async (role: 'owner' | 'approver' | 'viewer', name: string) => withTenant(h.db, t, async (tx) => {
     const id = randomUUID();

@@ -8,7 +8,7 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 
 ## For Dan: where things stand (plain English)
 
-**Last updated:** 14 October 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.13
+**Last updated:** 20 October 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.13
 
 **Status: build in progress.** Under contract Part J there are three separate milestones: *build-complete* (code and tests done), *production-approved* (deployment, recovery, security, support, legal documents all proven: [`docs/readiness/`](docs/readiness/README.md)), and *commercially launched* (pilots prove the product is worth paying for: the Value Gate). Passing automated tests is **not** evidence that Sevari is ready for paying customers.
 
@@ -22,8 +22,9 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 | 5 | The local AI models and how they're scored | ✅ Code done · **your step:** run the model benchmark on the VPS ([how](docs/ops/model-benchmark.md)) |
 | 18 → 6 | Your approvals: questions to you, one-tap approve, nothing sends without it, your inbox app | ✅ Done |
 | 7 | Privacy: erasure, data requests, retention, the consent record, key management | ✅ Done |
-| 8 | Measurements and weekly reports | Next |
-| 9+ | Lifecycle, missed-call texts, finance, complaints, offboarding, learning, hardening | Planned |
+| 8 | Measurements and weekly reports | ✅ Done · **your step:** approve the service levels (Q-20) |
+| 9 | Bookings and the job lifecycle | Next |
+| 10+ | Missed-call texts, finance, complaints, offboarding, learning, hardening | Planned |
 | K1–K6 | **Agent Mode**: the seven agents (BASTION, SENTINEL, LEDGER, VANGUARD, HERALD, COMPASS, FORGE) as plug-in packs | Planned (after approvals are built) |
 
 **What's proven so far (each one is an automatic test that runs on every change):**
@@ -72,6 +73,10 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 - **Consent is a permanent record.** Every "yes" and "no thanks" is recorded with the exact wording the person saw. The latest answer always wins, and nobody can edit or delete the history.
 - **Keeping data only as long as allowed:** Sevari reports what is past its keep-by date, but deletes nothing until a lawyer confirms the periods. Deleting too early can break other legal duties.
 - **Encryption keys can be rotated, revoked and recovered**, including a full drill for a suspected key leak. Tested end to end.
+- **Every week you get a plain-English report**, built only from the numbers: how many enquiries came in, how fast each was acknowledged, how many replies went out, what you approved, changed or stopped, how long your decisions took, and the questions customers asked that your records couldn't answer yet (your to-do list). It's sent once per week, never twice.
+- **Two numbers must always be zero, and are checked every week:** messages sent without your approval or an earned permission, and messages sent to someone who asked to stop. A test forges a bad send to prove the check catches it. The measurements obey the same walls as everything else: one business can never measure another.
+- **Service levels need your approval.** The app won't let real businesses go live until you've approved the service levels (uptime, recovery time, backups: see Q-20) *and* a lawyer has signed off, each with a record in the system. Writing numbers into a settings file without the record stops the app from starting.
+- **First baseline report:** 100 test enquiries across the five trades, all acknowledged except the 5 who asked to stop (who were never messaged again), with both must-be-zero numbers at zero: [`docs/reports/baseline-v1.md`](docs/reports/baseline-v1.md).
 - Sevari can't connect to any outside service unless you've approved that supplier. This is enforced three ways: in the code, by a gatekeeper process, and by the server's firewall (proven by a test). The supplier list (processor register) is generated automatically and currently says: no suppliers approved yet.
 
 **Your decisions of 14 October (contract v1.12, Part L):**
@@ -127,6 +132,7 @@ packages/
   hitl/               structured questions, answers, acknowledgements, effect receipts, escalation sweep (§30, §74)
   identity/           tenant user and operator credentials, platform decisions, two-person sign-offs (§71, §82)
   privacy/            erasure registry, per-person crypto-erasure, data-rights requests and copies, consent ledger, retention reports, shred register, key drills
+  metrics/            measurement views (row-level security applies), weekly owner report, the two must-be-zero floors
   llm/                model layer: provider port (Ollama via egress, VSAP stub, fake), versioned prompts, schema-checked tasks, registry selection, grounded model drafts
 apps/worker/          queue runner (NOTIFY wake-up, bounded concurrency); inbound.process; ack.send; enquiry.respond; draft.dispatch; outbox.reconcile; hitl.sweep; answer consumers
 eval/                 100-case labelled corpus, knowledge fixtures, runner, reports, accepted baseline
@@ -185,7 +191,7 @@ pnpm models:registry list|register|promote|retire   # owner role; promotion need
 - `contract-progress`: every contract test, red included, plus the status table. Informational.
 
 ### Contract test status
-Run `pnpm contract:status` for the live table. After Phases 6, 7 and 18: F5, T-KEY-1–4, F6, F8, T-RES, T-CHAOS, F22–F27, F46–F58 and T-SIGNOFF join F1 (database and API), F3 (grounding, property-based), F3H (holdout harness; starter cases only, DEV-009), F7 (ACK latency), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LLM, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
+Run `pnpm contract:status` for the live table. After Phases 6, 7, 8 and 18: T-SLO, F5, T-KEY-1–4, F6, F8, T-RES, T-CHAOS, F22–F27, F46–F58 and T-SIGNOFF join F1 (database and API), F3 (grounding, property-based), F3H (holdout harness; starter cases only, DEV-009), F7 (ACK latency), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LLM, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
 
 ### Documents
 - [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md): the binding contract (v1.13)
@@ -194,6 +200,7 @@ Run `pnpm contract:status` for the live table. After Phases 6, 7 and 18: F5, T-K
 - [`docs/readiness/README.md`](docs/readiness/README.md): Production Readiness, the full stress-test campaign, and the Value Gate
 - [`docs/security/key-management.md`](docs/security/key-management.md): the honest key threat model
 - [`docs/privacy/backups-and-erasure.md`](docs/privacy/backups-and-erasure.md): how erasure reaches backups
+- [`docs/reports/baseline-v1.md`](docs/reports/baseline-v1.md): the first measured baseline (Phase 8)
 - [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md): what's needed for pilots, for launch, or deferred
 - [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md): every difference from the contract, with reasons
 - [`docs/QUESTIONS_FOR_DAN.md`](docs/QUESTIONS_FOR_DAN.md): open decisions

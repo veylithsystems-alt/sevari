@@ -19,6 +19,7 @@
     "@sevari/intake": "workspace:*",
     "@sevari/knowledge": "workspace:*",
     "@sevari/llm": "workspace:*",
+    "@sevari/metrics": "workspace:*",
     "@sevari/outbound": "workspace:*",
     "@sevari/privacy": "workspace:*",
     "@sevari/templates": "workspace:*",

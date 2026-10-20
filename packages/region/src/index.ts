@@ -72,3 +72,27 @@ export function routeForTenant(cell: CellIdentity, tenantHome: RegionCode, cellU
   if (!location) throw new ContractViolation('§5.1', `no cell URL configured for region ${tenantHome}`);
   return { kind: 'redirect', location };
 }
+
+/** Service levels for a deployment (Part J §70). Null until Dan approves; then all must be set. */
+export const SloConfigSchema = z.object({
+  version: z.literal(1),
+  availability_target_percent: z.number().min(90).max(100).nullable(),
+  rto_minutes: z.number().int().positive().nullable(),
+  rpo_minutes: z.number().int().nonnegative().nullable(),
+  backup_frequency_hours: z.number().int().positive().nullable(),
+  restore_acceptance: z.string().min(5).nullable(),
+  ack_target_p95_ms: z.number().int().positive(),
+}).superRefine((c, ctx) => {
+  const vals = [c.availability_target_percent, c.rto_minutes, c.rpo_minutes, c.backup_frequency_hours, c.restore_acceptance];
+  if (vals.some((v) => v !== null) && vals.some((v) => v === null)) ctx.addIssue({ code: 'custom', message: 'service levels are approved as a set: fill in all of them, or none' });
+  if (c.backup_frequency_hours !== null && c.rpo_minutes !== null && c.backup_frequency_hours * 60 > c.rpo_minutes) {
+    ctx.addIssue({ code: 'custom', message: 'the recovery point (RPO) can\'t be shorter than the backup interval without continuous log shipping' });
+  }
+});
+export type SloConfig = z.infer<typeof SloConfigSchema>;
+
+export async function loadSloConfig(configDir: string): Promise<SloConfig> {
+  return SloConfigSchema.parse(parse(await readFile(join(configDir, 'slo.yaml'), 'utf8')) as unknown);
+}
+
+export const sloApproved = (c: SloConfig): boolean => c.availability_target_percent !== null;

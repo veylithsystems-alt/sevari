@@ -1,0 +1,11 @@
+# Service levels, recovery and performance for this deployment (Part J §70).
+# Dan approves these values, recorded as a platform decision (scope cell:<region>:slo). Until then every
+# value is null and the cell refuses live tenants (boot check "slo", like the counsel sign-off in §8.4).
+# Claude Code never fills these in. Proposals for Dan are in docs/QUESTIONS_FOR_DAN.md (Q-20).
+version: 1
+availability_target_percent: null   # monthly, e.g. 99.5
+rto_minutes: null                   # how long a full recovery may take
+rpo_minutes: null                   # how much recent data a recovery may lose
+backup_frequency_hours: null
+restore_acceptance: null            # e.g. "restore drill passes monthly, erasures re-applied"
+ack_target_p95_ms: 10000            # F7 / §15.2 default; measured with the model busy and a slow provider

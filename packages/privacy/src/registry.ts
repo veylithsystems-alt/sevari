@@ -73,6 +73,7 @@ export const ERASURE_REGISTRY: Readonly<Record<string, TableEntry>> = {
   consents: { purpose: 'consent ledger per person, purpose and channel (§17.2)', lawfulBasis: 'legal obligation (proof of consent, PECR/UK GDPR)', category: 'contact', retention: H(2190, 'relationship_end'), erasure: 'delete', columns: {} },
   erasure_log: { purpose: 'proof of erasure, and re-applying it after a backup restore (F35)', lawfulBasis: 'legal obligation (accountability)', category: 'contact', retention: H(null, 'never'), erasure: 'retain-legal-hold', legalHoldReason: 'Holds only ids and keyed blind indexes, needed to re-apply the erasure if a backup is ever restored.', columns: { identifiers: { category: 'contact', erasure: 'retain-legal-hold', dsar: false, note: 'blind indexes only' } } },
   retention_runs: { purpose: 'retention reports and enforcement runs (§6.4)', lawfulBasis: 'legal obligation (storage limitation)', category: 'none', retention: H(2190, 'created'), erasure: 'none', columns: {} },
+  owner_reports: { purpose: 'weekly owner reports (§8.1)', lawfulBasis: 'contract', category: 'contact', retention: H(730, 'created'), erasure: 'delete', columns: { body_enc: enc() } },
   users: {
     purpose: 'tenant staff accounts', lawfulBasis: 'contract', category: 'contact', retention: H(365, 'relationship_end'), erasure: 'delete',
     columns: { display_name_enc: enc(), email_enc: enc(), email_bidx: enc(false), phone_enc: enc(), phone_bidx: enc(false) },

@@ -14,6 +14,7 @@ import { factsBundle, replySections, type ActionClass, type EnquiryAnalysis } fr
 import { ground } from '@sevari/grounding';
 import { ask, digestOf, type ConsumerRegistry } from '@sevari/hitl';
 import { classifyRightsRequest, openDsar } from '@sevari/privacy';
+import { scheduleWeeklyReport } from '@sevari/metrics';
 import { snapshotAt } from '@sevari/knowledge';
 import { recordReply } from '@sevari/outbound';
 import { render } from '@sevari/templates';
@@ -38,6 +39,7 @@ export async function respond(deps: RespondDeps, tx: TenantTx, enquiryId: string
   const already = await tx.selectFrom('drafts').select('id').where('enquiry_id', '=', enquiryId).executeTakeFirst()
     ?? await tx.selectFrom('human_questions').select('id').where('subject_ref', '=', `enquiry:${enquiryId}`).executeTakeFirst();
   if (already) return { outcome: 'already' };
+  await scheduleWeeklyReport(tx, deps.clock.nowMs());
   if (e.route === 'safety_first' || e.route === 'opt_out') return { outcome: `handled_by_ack:${e.route}` };
 
   const a = JSON.parse(await deps.keyring.openText(tx, { table: 'enquiries', column: 'analysis_enc', rowId: e.id }, e.analysis_enc)) as EnquiryAnalysis;
