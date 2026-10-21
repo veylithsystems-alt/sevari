@@ -18,6 +18,7 @@ import { snapshotAt } from '@sevari/knowledge';
 import { assembleCopy, DOWNLOAD_TTL_MS, prepareDownload } from '@sevari/privacy';
 import { reserve } from '@sevari/outbound';
 import { render } from '@sevari/templates';
+import { releaseForDraft } from './bookings.ts';
 import { customerOf } from './respond.ts';
 import { createDraft, loadDraft, OUTBOX_DISPATCH_JOB, refusalText, sendDraft, type SendDeps } from './sending.ts';
 
@@ -44,6 +45,7 @@ export function makeConsumers(deps: SendDeps): ConsumerRegistry {
       if (ctx.response === 'approve') return sendWithApproval(ctx, draftId);
       if (ctx.response === 'reject') {
         await ctx.tx.updateTable('drafts').set({ status: 'rejected' }).where('id', '=', draftId).where('status', '=', 'pending_approval').execute();
+        await releaseForDraft(deps, ctx.tx, draftId);
         return done('draft.rejected', `draft:${draftId}`, 'Done. Nothing was sent. The customer has their acknowledgement, and the enquiry stays open for you.');
       }
       // edit
@@ -80,6 +82,7 @@ export function makeConsumers(deps: SendDeps): ConsumerRegistry {
     },
     async onExpired(tx, q) {
       await tx.updateTable('drafts').set({ status: 'expired' }).where('id', '=', ref(q)).where('status', '=', 'pending_approval').execute();
+      await releaseForDraft(deps, tx, ref(q));
     },
   };
 
@@ -89,6 +92,7 @@ export function makeConsumers(deps: SendDeps): ConsumerRegistry {
       const draftId = ref(ctx.question);
       if (ctx.response === 'cancel') {
         await ctx.tx.updateTable('drafts').set({ status: 'rejected' }).where('id', '=', draftId).where('status', '=', 'pending_approval').execute();
+        await releaseForDraft(deps, ctx.tx, draftId);
         return done('draft.rejected', `draft:${draftId}`, 'Done. Nothing was sent.');
       }
       const d = await loadDraft(deps, ctx.tx, draftId);
@@ -106,6 +110,7 @@ export function makeConsumers(deps: SendDeps): ConsumerRegistry {
     },
     async onExpired(tx, q) {
       await tx.updateTable('drafts').set({ status: 'expired' }).where('id', '=', ref(q)).where('status', '=', 'pending_approval').execute();
+      await releaseForDraft(deps, tx, ref(q));
     },
   };
 

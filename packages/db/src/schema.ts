@@ -318,7 +318,7 @@ export interface AutonomyGrantsTable extends Meta, Tenant {
   revoked_at: Date | null;
   revoke_reason: string | null;
 }
-export type QuestionKind = 'approve_draft' | 'clarify_edit' | 'owner_task' | 'autonomy_grant' | 'knowledge_update' | 'dsar_release';
+export type QuestionKind = 'approve_draft' | 'clarify_edit' | 'owner_task' | 'autonomy_grant' | 'knowledge_update' | 'dsar_release' | 'lifecycle_step';
 export type SafeDefault = 'hold' | 'reask' | 'escalate' | 'fail_closed';
 export interface HumanQuestionsTable extends Meta, Tenant {
   kind: QuestionKind;
@@ -431,6 +431,72 @@ export interface OwnerReportsTable extends Meta, Tenant {
   metrics: ColumnType<Record<string, unknown>, string, never>;
   body_enc: Buffer;
 }
+export interface LifecycleSubjectsTable extends Meta, Tenant {
+  lifecycle: string;
+  definition_version: number;
+  definition_hash: string;
+  subject_type: string;
+  contact_id: string;
+  state: string;
+  state_seq: Generated<number>;
+  state_entered_at: Date;
+  anchors: ColumnType<Record<string, string | number>, string | undefined, string>;
+}
+export type TransitionAuthority = 'system' | 'automatic' | 'grant' | 'approval' | 'human';
+export interface LifecycleTransitionsTable extends Meta, Tenant {
+  subject_id: string;
+  seq: number;
+  from_state: string | null;
+  to_state: string;
+  event: string;
+  action_class: string | null;
+  authority: TransitionAuthority;
+  authority_ref: string | null;
+  idempotency_key: string;
+  actor: string;
+  definition_version: number;
+  definition_hash: string;
+  occurred_at: Date;
+}
+export interface LifecycleTimersTable extends Meta, Tenant {
+  subject_id: string;
+  state_seq: number;
+  event: string;
+  fires_at: Date;
+  status: Generated<'pending' | 'fired' | 'cancelled' | 'stale'>;
+  settled_at: Date | null;
+}
+export interface OfferedWindow { startMs: number; endMs: number; date: string; start: string; end: string }
+export interface BookingOffersTable extends Meta, Tenant {
+  contact_id: string;
+  conversation_id: string;
+  enquiry_id: string | null;
+  draft_id: string | null;
+  service: string | null;
+  windows: ColumnType<OfferedWindow[], string, never>;
+  reschedule_of: string | null;
+  status: Generated<'pending' | 'sent' | 'taken' | 'expired' | 'withdrawn'>;
+  offered_at: Date;
+  expires_at: Date;
+}
+export type BookingStatus = 'held' | 'confirmed' | 'released' | 'cancelled' | 'completed' | 'no_show' | 'rescheduled';
+export interface BookingsTable extends Meta, Tenant {
+  contact_id: string;
+  conversation_id: string | null;
+  enquiry_id: string | null;
+  offer_id: string | null;
+  resource: Generated<string>;
+  service: string | null;
+  starts_at: Date;
+  ends_at: Date;
+  status: BookingStatus;
+  hold_expires_at: Date | null;
+  draft_id: string | null;
+  cancel_draft_id: string | null;
+  replaces_id: string | null;
+  confirmed_at: Date | null;
+  closed_at: Date | null;
+}
 type ViewOf<T> = { readonly [K in keyof T]: T[K] };
 export type MetricsEnquiryFlowView = ViewOf<{
   tenant_id: string; region: string; enquiry_id: string; received_at: Date; analysed_at: Date; route: string; intent: string; intent_source: string; abstained: boolean;
@@ -482,7 +548,14 @@ export interface Database {
   human_inputs: HumanInputsTable;
   effect_receipts: EffectReceiptsTable;
   human_notifications: HumanNotificationsTable;
+  lifecycle_subjects: LifecycleSubjectsTable;
+  lifecycle_transitions: LifecycleTransitionsTable;
+  lifecycle_timers: LifecycleTimersTable;
+  booking_offers: BookingOffersTable;
+  bookings: BookingsTable;
 }
 
 export type QuestionRow = Selectable<HumanQuestionsTable>;
 export type DraftRow = Selectable<DraftsTable>;
+export type BookingRow = Selectable<BookingsTable>;
+export type LifecycleSubjectRow = Selectable<LifecycleSubjectsTable>;

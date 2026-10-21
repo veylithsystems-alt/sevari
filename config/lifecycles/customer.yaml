@@ -1,0 +1,66 @@
+# Lifecycle T (§16): a tenant business and its own customer. Data, not code: change it here, the engine
+# validates it at start-up (states reachable, one step per state and event, all 12 stages covered).
+id: customer_journey
+version: 1
+lifecycle: T
+subject_type: customer
+description: A customer of a business using Sevari, from first message to repeat customer or exit.
+initial: new
+
+states:
+  new:              { stage: 1, label: New contact }
+  engaged:          { stage: 2, label: Enquiring }
+  offered:          { stage: 3, label: Offered a price or appointment times, timers: [{ event: offer_lapsed, after_minutes: 20160 }] }
+  booked:           { stage: 4, label: Booked, timers: [{ event: job_due, after_minutes: 60, anchor: booking_end }] }
+  awaiting_outcome: { stage: 6, label: "Job day passed, waiting to hear how it went" }
+  completed:        { stage: 6, label: Job done, timers: [{ event: went_quiet, after_minutes: 129600 }] }
+  missed:           { stage: 6, label: Job did not go ahead, timers: [{ event: went_quiet, after_minutes: 43200 }] }
+  in_dispute:       { stage: 10, label: Complaint open }
+  dormant:          { stage: 11, label: Past customer }
+  cancelled:        { stage: 12, label: Booking cancelled }
+  lost:             { stage: 12, label: Did not go ahead }
+  opted_out:        { stage: 12, label: Asked not to be contacted, terminal: true }
+
+# Stages with no state of their own (§16.1: they still exist, done automatically elsewhere or by a person).
+stages:
+  "5":  { automatic: "The customer record, consent and preferences are captured when the first message arrives (intake, §17.2)." }
+  "7":  { automatic: "Questions, changes and rebooking are answered from the business's records at any point in the journey." }
+  "8":  { human: "Invoices: the owner sends them until the finance phase (Phase 12) automates invoicing." }
+  "9":  { human: "Matching payments to invoices: the owner, until the finance phase (Phase 12)." }
+
+transitions:
+  - { from: [new, completed, missed, dormant, lost, cancelled], event: enquiry_received, to: engaged }
+  - { from: [engaged, offered], event: offer_sent, to: offered }
+  - { from: [new, engaged, offered], event: booking_confirmed, to: booked, action_class: booking_create }
+  - { from: [booked], event: booking_rescheduled, to: booked, action_class: booking_change }
+  - { from: [booked], event: booking_cancelled, to: cancelled, action_class: cancel }
+  - { from: [offered], event: offer_lapsed, to: lost }
+  - from: [booked]
+    event: job_due
+    to: awaiting_outcome
+    effects:
+      - ask_owner:
+          title: Did the job go ahead?
+          summary: The appointment time has passed. Tell Sevari how it went, so the customer's record is right.
+          options:
+            - { event: job_done, label: "Yes, it's done" }
+            - { event: job_missed, label: "No, it didn't happen" }
+          deadline_hours: 168
+          safe_default_text: Nothing changes until you answer.
+  - { from: [awaiting_outcome], event: job_done, to: completed, effects: [{ set_booking_status: completed }] }
+  - { from: [awaiting_outcome], event: job_missed, to: missed, effects: [{ set_booking_status: no_show }] }
+  - { from: [completed], event: went_quiet, to: dormant }
+  - { from: [missed], event: went_quiet, to: lost }
+  - from: "*"
+    event: complaint_opened
+    to: in_dispute
+    effects:
+      - ask_owner:
+          title: When the complaint is resolved, tell Sevari
+          summary: A customer has complained. Sevari has sent them a holding reply and will not send them anything automatic until you mark it resolved.
+          options:
+            - { event: complaint_resolved, label: It's resolved }
+          deadline_hours: 720
+          safe_default_text: The complaint stays open, and nothing automatic is sent to this customer.
+  - { from: [in_dispute], event: complaint_resolved, to: completed, human: true }
+  - { from: "*", event: opted_out, to: opted_out }

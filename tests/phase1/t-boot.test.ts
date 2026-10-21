@@ -37,7 +37,7 @@ contractSuite('T-BOOT', () => {
     const report = await assertBoot(deps);
     expect(report.ok).toBe(true);
     expect(report.checks.map((c) => c.name).sort()).toEqual(
-      ['db.migrations', 'db.role', 'db.rls', 'egress.policy', 'kms', 'region.config', 'registry.erasure', 'signoffs', 'slo'].sort());
+      ['db.migrations', 'db.role', 'db.rls', 'egress.policy', 'kms', 'region.config', 'lifecycles', 'registry.erasure', 'signoffs', 'slo'].sort());
   });
 
   it('refuses when RLS is switched off on any table', async () => {

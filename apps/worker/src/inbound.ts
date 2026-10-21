@@ -12,10 +12,12 @@ import { appendAudit } from '@sevari/audit';
 import type { Clock } from '@sevari/clock';
 import type { TenantKeyring } from '@sevari/crypto';
 import { enqueue, withTenant, type Db, type TenantTx } from '@sevari/db';
-import { analyseEnquiry, classifyIntent as classifyByRules, ContractViolation, sensitiveFlags, type ModelIntent, type TenantScope, type VerticalPack, type KnowledgeSnapshot } from '@sevari/domain';
+import { analyseEnquiry, classifyIntent as classifyByRules, ContractViolation, sensitiveFlags, type BookingFact, type ModelIntent, type TenantScope, type VerticalPack, type KnowledgeSnapshot } from '@sevari/domain';
 import { snapshotAt } from '@sevari/knowledge';
 import { classifyIntent as classifyByModel, loadModelRegistry, selectModel, type LlmProvider, type ModelEntry, type ModelTrace } from '@sevari/llm';
 import { packFor } from '@sevari/verticals';
+import { busyTimes, upcomingBooking } from './bookings.ts';
+import { journeyEvent, type Lifecycles } from './journey.ts';
 
 export const CORE_VERSION = 'core-0.4.0';
 export const RESPOND_JOB = 'enquiry.respond';
@@ -23,6 +25,7 @@ export const RESPOND_JOB = 'enquiry.respond';
 export interface InboundDeps {
   readonly keyring: TenantKeyring;
   readonly clock: Clock;
+  readonly lifecycles?: Lifecycles;
 }
 
 export interface InboundOptions {
@@ -40,6 +43,8 @@ interface InboundContext {
   readonly pack: VerticalPack;
   readonly timezone: string;
   readonly clarificationsSoFar: number;
+  readonly busy: readonly { startMs: number; endMs: number }[];
+  readonly booking?: BookingFact;
 }
 
 async function loadContext(deps: InboundDeps, tx: TenantTx, messageId: string): Promise<InboundContext> {
@@ -62,7 +67,10 @@ async function loadContext(deps: InboundDeps, tx: TenantTx, messageId: string): 
   const timezone = knowledge.hours?.body.timezone ?? 'Europe/London';
   const clarificationsSoFar = (await tx.selectFrom('enquiries').select('id')
     .where('conversation_id', '=', msg.conversation_id).where('route', '=', 'clarify').execute()).length;
-  return { msg, text, ...(subject ? { subject } : {}), ...(fromName ? { fromName } : {}), nowMs, knowledge, pack, timezone, clarificationsSoFar };
+  // Availability avoids every held or booked slot; the customer's own next booking is a fact about them.
+  const busy = await busyTimes(tx, nowMs);
+  const booking = await upcomingBooking(tx, msg.contact_id, nowMs, timezone);
+  return { msg, text, ...(subject ? { subject } : {}), ...(fromName ? { fromName } : {}), nowMs, knowledge, pack, timezone, clarificationsSoFar, busy, ...(booking ? { booking } : {}) };
 }
 
 export async function processInbound(deps: InboundDeps, tx: TenantTx, messageId: string, opts: InboundOptions = {}): Promise<{ enquiryId: string; route: string; replayed: boolean }> {
@@ -73,7 +81,8 @@ export async function processInbound(deps: InboundDeps, tx: TenantTx, messageId:
   const { msg, pack } = c;
   const a = analyseEnquiry({
     text: c.text, ...(c.subject ? { subject: c.subject } : {}), ...(c.fromName ? { fromName: c.fromName } : {}), nowMs: c.nowMs, timezone: c.timezone,
-    pack, knowledge: c.knowledge, clarificationsSoFar: c.clarificationsSoFar, ...(opts.modelIntent ? { modelIntent: opts.modelIntent } : {}),
+    pack, knowledge: c.knowledge, clarificationsSoFar: c.clarificationsSoFar, busy: c.busy, ...(c.booking ? { booking: c.booking } : {}),
+    ...(opts.modelIntent ? { modelIntent: opts.modelIntent } : {}),
   });
   const enquiryId = randomUUID();
   await tx.insertInto('enquiries').values({
@@ -87,6 +96,9 @@ export async function processInbound(deps: InboundDeps, tx: TenantTx, messageId:
     analysed_at: deps.clock.now(),
   }).execute();
   await enqueue(tx, { kind: RESPOND_JOB, dedupeKey: enquiryId, payload: { enquiry_id: enquiryId } });
+  // The person's journey (§16): first contact starts it; an opt-out or complaint moves it at once.
+  const event = a.route === 'opt_out' ? 'opted_out' : a.intent.intent === 'complaint' || a.flags.includes('complaint') ? 'complaint_opened' : 'enquiry_received';
+  await journeyEvent(deps, tx, msg.contact_id, { event, idempotencyKey: `enquiry:${enquiryId}`, actor: `customer:message:${msg.id}` });
   const t = opts.modelTrace;
   await appendAudit(tx, {
     type: 'enquiry.analysed', actor: { kind: 'system', ref: CORE_VERSION }, subject: `enquiry:${enquiryId}`,

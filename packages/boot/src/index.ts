@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import type { Clock } from '@sevari/clock';
 import { registryGaps } from '@sevari/privacy';
 import { verifySignoff } from '@sevari/identity';
+import { loadLifecycles } from '@sevari/lifecycle';
 import { liveTenantStatus, loadRegionConfig, loadSloConfig, sloApproved } from '@sevari/region';
 
 export interface BootCheck {
@@ -98,6 +99,15 @@ export async function runBootChecks(deps: BootDeps): Promise<BootReport> {
       const v = await verifySignoff(deps.db, `cell:${deps.region}:slo`, deps.clock.now().toISOString().slice(0, 10), ['founder']);
       if (!v.ok) throw new Error(`configuration sets service levels that have no approval record: ${v.reason}`);
       return `service levels approved (availability ${slo.availability_target_percent}%, RTO ${slo.rto_minutes} min, RPO ${slo.rpo_minutes} min)`;
+    }),
+    check('lifecycles', async () => {
+      // §16: both lifecycles are data, validated here (reachable, deterministic, all 12 stages covered).
+      const defs = [...(await loadLifecycles(join(deps.configDir, 'lifecycles'))).values()];
+      for (const want of ['V', 'T'] as const) {
+        const n = defs.filter((d) => d.lifecycle === want).length;
+        if (n !== 1) throw new Error(`expected exactly one Lifecycle ${want} definition, found ${n}`);
+      }
+      return defs.map((d) => `${d.id} v${d.version} (${Object.keys(d.states).length} states)`).join(', ');
     }),
     check('registry.erasure', async () => {
       if (!tables) throw new Error('cannot read schema');

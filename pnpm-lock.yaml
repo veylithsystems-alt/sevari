@@ -59,6 +59,9 @@ importers:
       '@sevari/knowledge':
         specifier: workspace:*
         version: link:packages/knowledge
+      '@sevari/lifecycle':
+        specifier: workspace:*
+        version: link:packages/lifecycle
       '@sevari/llm':
         specifier: workspace:*
         version: link:packages/llm
@@ -200,6 +203,9 @@ importers:
       '@sevari/knowledge':
         specifier: workspace:*
         version: link:../../packages/knowledge
+      '@sevari/lifecycle':
+        specifier: workspace:*
+        version: link:../../packages/lifecycle
       '@sevari/llm':
         specifier: workspace:*
         version: link:../../packages/llm
@@ -272,6 +278,9 @@ importers:
       '@sevari/identity':
         specifier: workspace:*
         version: link:../identity
+      '@sevari/lifecycle':
+        specifier: workspace:*
+        version: link:../lifecycle
       '@sevari/privacy':
         specifier: workspace:*
         version: link:../privacy
@@ -409,6 +418,30 @@ importers:
       '@sevari/domain':
         specifier: workspace:*
         version: link:../domain
+
+  packages/lifecycle:
+    dependencies:
+      '@sevari/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@sevari/autonomy':
+        specifier: workspace:*
+        version: link:../autonomy
+      '@sevari/clock':
+        specifier: workspace:*
+        version: link:../clock
+      '@sevari/db':
+        specifier: workspace:*
+        version: link:../db
+      '@sevari/domain':
+        specifier: workspace:*
+        version: link:../domain
+      yaml:
+        specifier: 2.8.1
+        version: 2.8.1
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
 
   packages/llm:
     dependencies:

@@ -17,6 +17,8 @@ import { enqueue, type DraftRow, type TenantTx } from '@sevari/db';
 import { ground, type GroundingFailure, type GroundingSources } from '@sevari/grounding';
 import { snapshotAt } from '@sevari/knowledge';
 import { normaliseRecipient, reserve } from '@sevari/outbound';
+import { checkBookingDraft, commitBookingDraft, releaseForDraft } from './bookings.ts';
+import type { Lifecycles } from './journey.ts';
 
 export const DISPATCH_JOB = 'draft.dispatch';
 export const RECONCILE_JOB = 'outbox.reconcile';
@@ -27,6 +29,8 @@ export interface SendDeps {
   readonly clock: Clock;
   /** The cell's public origin, for links in messages (e.g. a data-copy download). */
   readonly publicBaseUrl?: string;
+  /** The cell's lifecycle definitions; defaults to the build's own (config/lifecycles). */
+  readonly lifecycles?: Lifecycles;
 }
 
 export interface StoredSources {
@@ -97,7 +101,7 @@ export type Authority =
   | { readonly kind: 'approval'; readonly inputId: string; readonly approverId: string }
   | { readonly kind: 'grant'; readonly grantId: string };
 
-export type SendRefusal = 'not_pending' | 'tampered' | 'stale_facts' | 'grounding' | 'approval' | 'suppressed';
+export type SendRefusal = 'not_pending' | 'tampered' | 'stale_facts' | 'grounding' | 'approval' | 'suppressed' | 'booking_lost' | 'booking_changed';
 export type SendResult =
   | { readonly status: 'queued'; readonly outboxId: string }
   | { readonly status: 'refused'; readonly reason: SendRefusal; readonly failures?: readonly GroundingFailure[] };
@@ -108,7 +112,11 @@ export interface OwnerFacts { readonly texts: readonly string[]; readonly ids: r
 export async function sendDraft(deps: SendDeps, tx: TenantTx, draftId: string, authority: Authority, owner?: OwnerFacts, opts: { readonly receiptByDispatch?: boolean } = {}): Promise<SendResult> {
   const d = await loadDraft(deps, tx, draftId, true);
   if (!d || d.row.status !== 'pending_approval') return { status: 'refused', reason: 'not_pending' };
-  const setStatus = (status: DraftRow['status']) => tx.updateTable('drafts').set({ status }).where('id', '=', draftId).execute();
+  // A draft that will never go lets go of any slot it was holding.
+  const setStatus = async (status: DraftRow['status']) => {
+    await tx.updateTable('drafts').set({ status }).where('id', '=', draftId).execute();
+    await releaseForDraft(deps, tx, draftId);
+  };
 
   // Integrity: what is about to be sent is exactly what was approved (§7.1).
   const digest = payloadDigest({ actionClass: d.row.action_class, channel: d.row.channel, recipient: d.recipient, body: d.body });
@@ -120,7 +128,8 @@ export async function sendDraft(deps: SendDeps, tx: TenantTx, draftId: string, a
   const snap = await snapshotAt(tx, deps.keyring, deps.clock.nowMs());
   const current = new Set([snap.business, snap.hours, ...snap.services, ...snap.prices, ...snap.areas, ...snap.policies, ...snap.faqs]
     .filter((x) => x !== undefined).map((x) => `${x.id}@${x.version}`));
-  if (d.row.facts_used.some((id) => !current.has(id))) {
+  // Booking facts are checked against the bookings themselves, below.
+  if (d.row.facts_used.filter((id) => !id.startsWith('booking:') && !id.startsWith('offer:')).some((id) => !current.has(id))) {
     await setStatus('superseded');
     return { status: 'refused', reason: 'stale_facts' };
   }
@@ -132,8 +141,14 @@ export async function sendDraft(deps: SendDeps, tx: TenantTx, draftId: string, a
     await setStatus('blocked');
     return { status: 'refused', reason: 'grounding', failures: g.failures };
   }
+  const booking = await checkBookingDraft(tx, snap.hours?.body.timezone ?? 'Europe/London', d.row, d.body);
+  if (booking) {
+    await setStatus(booking === 'stale_facts' ? 'superseded' : 'blocked');
+    return { status: 'refused', reason: booking };
+  }
+  let approvalId: string | null = null;
   if (authority.kind === 'approval') {
-    const approvalId = await createApproval(tx, { draftId, actionClass: d.row.action_class, digest, approverId: authority.approverId, inputId: authority.inputId });
+    approvalId = await createApproval(tx, { draftId, actionClass: d.row.action_class, digest, approverId: authority.approverId, inputId: authority.inputId });
     if (!(await consumeApproval(tx, approvalId, digest))) return { status: 'refused', reason: 'approval' };
   } else {
     const live = await tx.selectFrom('autonomy_grants').select('id').where('id', '=', authority.grantId).where('revoked_at', 'is', null).where('action_class', '=', d.row.action_class).executeTakeFirst();
@@ -149,6 +164,8 @@ export async function sendDraft(deps: SendDeps, tx: TenantTx, draftId: string, a
     return { status: 'refused', reason: 'suppressed' };
   }
   await tx.updateTable('drafts').set({ status: 'approved', outbox_id: r.outboxId }).where('id', '=', draftId).execute();
+  // The business has now committed: the offer counts as made, the held slot becomes a booking (§24).
+  await commitBookingDraft(deps, tx, d.row, approvalId ? { kind: 'approval', approvalId } : { kind: 'grant', grantId: (authority as { grantId: string }).grantId });
   await enqueue(tx, { kind: DISPATCH_JOB, dedupeKey: `dispatch:${draftId}`, payload: { draft_id: draftId, outbox_id: r.outboxId, input_id: authority.kind === 'approval' && opts.receiptByDispatch !== false ? authority.inputId : null, grant_id: authority.kind === 'grant' ? authority.grantId : null } });
   await appendAudit(tx, { type: 'draft.authorised', actor: authority.kind === 'approval' ? { kind: 'user', ref: authority.approverId } : { kind: 'system', ref: `grant:${authority.grantId}` }, subject: `draft:${draftId}`, payload: { authority: authority.kind, outbox_ref: `outbox:${r.outboxId}` } });
   return { status: 'queued', outboxId: r.outboxId };
@@ -161,6 +178,8 @@ const REFUSAL_TEXT: Record<SendRefusal, string> = {
   grounding: 'This reply contains something that is not in your confirmed records, so it was not sent.',
   approval: 'The approval could not be used (it may have expired or already been used). Nothing was sent.',
   suppressed: 'This customer has asked not to be contacted, so nothing was sent.',
+  booking_lost: 'The time in this message is no longer held (it lapsed, or the booking changed), so nothing was sent. The customer has not been told anything.',
+  booking_changed: 'A booking message must state the booked time exactly as it was held, so this version was not sent. Nothing was booked or changed.',
 };
 export const refusalText = (r: SendRefusal) => REFUSAL_TEXT[r];
 

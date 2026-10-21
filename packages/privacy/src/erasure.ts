@@ -36,7 +36,7 @@ export async function eraseSubject(deps: { keyring: TenantKeyring; clock: Clock;
   const contact = await tx.selectFrom('contacts').select(['id', 'email_bidx', 'phone_bidx']).where('id', '=', contactId).forUpdate().executeTakeFirst();
   const now = deps.clock.now();
 
-  const count = async (table: 'conversations' | 'outbox' | 'drafts' | 'consents', col: 'contact_id') =>
+  const count = async (table: 'conversations' | 'outbox' | 'drafts' | 'consents' | 'bookings' | 'booking_offers' | 'lifecycle_subjects', col: 'contact_id') =>
     Number((await tx.selectFrom(table).select(sql<string>`count(*)`.as('n')).where(col, '=', contactId).executeTakeFirstOrThrow()).n);
   const convIds = (await tx.selectFrom('conversations').select('id').where('contact_id', '=', contactId).execute()).map((r) => r.id);
   const msgs = convIds.length ? Number((await tx.selectFrom('messages').select(sql<string>`count(*)`.as('n')).where('conversation_id', 'in', convIds).executeTakeFirstOrThrow()).n) : 0;
@@ -44,6 +44,7 @@ export async function eraseSubject(deps: { keyring: TenantKeyring; clock: Clock;
   const deleted: Record<string, number> = {
     contacts: contact ? 1 : 0, conversations: await count('conversations', 'contact_id'), messages: msgs, enquiries: enqs,
     drafts: await count('drafts', 'contact_id'), outbox: await count('outbox', 'contact_id'), consents: await count('consents', 'contact_id'),
+    bookings: await count('bookings', 'contact_id'), booking_offers: await count('booking_offers', 'contact_id'), lifecycle_subjects: await count('lifecycle_subjects', 'contact_id'),
   };
 
   // 1. The key first: if anything below fails, the data is already unreadable. Recorded outside the

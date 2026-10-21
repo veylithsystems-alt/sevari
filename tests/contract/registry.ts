@@ -36,6 +36,13 @@ export const CONTRACT_TESTS: readonly ContractTest[] = [
   t('T-CHAOS', '6', '§10.1', 'Killing the worker mid-step resumes with no double send'),
   t('T-LINT', '0', '§4', 'Contract lint rules reject forbidden code'),
   // Part B
+  t('T-LC-1', '9', '§16', 'Lifecycles are data: definitions validated (reachable, deterministic, all 12 stages covered) or refused'),
+  t('T-LC-2', '9', '§16', 'Transitions are idempotent, serialised per subject, audited and tenant-isolated'),
+  t('T-LC-3', '9', '§16 §7 §8.3', 'A step that books, sends or moves money needs the autonomy policy; a human step needs a human answer; a timer authorises nothing'),
+  t('T-LC-4', '9', '§16', 'Timers fire only if the journey has not moved; both lifecycles run on one engine, V on the house tenant'),
+  t('T-BOOK-1', '9', '§16.1 §24', 'No double booking: overlapping holds refused by the database, also under concurrency'),
+  t('T-BOOK-2', '9', '§16.1 §24', 'Only an offered time can be booked, and only when its confirmation is authorised; a refusal frees the slot'),
+  t('T-BOOK-3', '9', '§16.1 §7.2', 'Follow-ups answered from the booking; cancellation always approved by a person; job outcome asked and recorded'),
   t('F9', '10', '§17.2', 'Suppression race: opt-out always wins over concurrent send'),
   t('F10', '10', '§17.2', 'A contact without provenance cannot be messaged'),
   t('F11', '10', '§17.2 §43', 'Sole traders / unknown subscribers are treated as individuals'),

@@ -5,3 +5,5 @@ export * from './sending.ts';
 export * from './respond.ts';
 export * from './consumers.ts';
 export * from './jobs.ts';
+export * from './journey.ts';
+export * from './bookings.ts';
