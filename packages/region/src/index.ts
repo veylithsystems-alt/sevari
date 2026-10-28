@@ -96,3 +96,28 @@ export async function loadSloConfig(configDir: string): Promise<SloConfig> {
 }
 
 export const sloApproved = (c: SloConfig): boolean => c.availability_target_percent !== null;
+
+/**
+ * The service levels Dan chose on 21 October 2026 (Q-20, "recommended set"). They only take effect when
+ * Dan's founder credential records the approval on the cell (scripts/approve-slo.ts): the values and the
+ * record are written together, never one without the other.
+ */
+export const APPROVED_SLO_2026_10_21 = Object.freeze({
+  availability_target_percent: 99.5,
+  rto_minutes: 240,
+  rpo_minutes: 1440,
+  backup_frequency_hours: 24,
+  restore_acceptance: 'monthly restore drill passes, with erasures re-applied from the shred register',
+});
+
+/** Writes approved service levels into slo.yaml, keeping comments and the ACK target. */
+export function withServiceLevels(yamlText: string, v: typeof APPROVED_SLO_2026_10_21): string {
+  let out = yamlText;
+  for (const [k, val] of Object.entries(v)) {
+    const re = new RegExp(`^(${k}:\\s*)(?:null|[^#\\n]*?)(\\s*(#.*)?)$`, 'm');
+    if (!re.test(out)) throw new Error(`slo.yaml has no ${k} line`);
+    out = out.replace(re, (_m, a: string, b: string) => `${a}${typeof val === 'string' ? JSON.stringify(val) : String(val)}${b}`);
+  }
+  SloConfigSchema.parse(parse(out) as unknown);
+  return out;
+}

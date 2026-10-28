@@ -81,7 +81,7 @@ export async function reserve(tx: TenantTx, keyring: TenantKeyring, clock: Clock
   return suppressed ? { status: 'suppressed', outboxId: id } : { status: 'reserved', outboxId: id, created: true };
 }
 
-export type DispatchResult = 'sent' | 'already_sent' | 'in_progress' | 'suppressed' | 'failed' | 'ambiguous' | 'not_dispatchable';
+export type DispatchResult = 'sent' | 'already_sent' | 'in_progress' | 'suppressed' | 'failed' | 'ambiguous' | 'not_dispatchable' | 'deferred';
 
 export interface DispatchDeps {
   readonly db: Db;
@@ -139,6 +139,12 @@ export async function dispatch(deps: DispatchDeps, scope: TenantScope, outboxId:
       }
       await appendAudit(tx, { type: 'send.failed', actor: { kind: 'provider', ref: deps.provider.name }, subject: `outbox:${outboxId}`, payload: { suppress: outcome.suppress } });
       return 'failed';
+    }
+    if (outcome.status === 'deferred') {
+      // The provider said "not now": nothing went out, so it goes back to the queue unchanged.
+      await tx.updateTable('outbox').set({ state: 'reserved', last_error: outcome.reason.slice(0, 200), lease_until: null }).where('id', '=', outboxId).where('state', '=', 'sending').execute();
+      await appendAudit(tx, { type: 'send.deferred', actor: { kind: 'provider', ref: deps.provider.name }, subject: `outbox:${outboxId}`, payload: {} });
+      return 'deferred';
     }
     await tx.updateTable('outbox').set({ state: 'ambiguous', last_error: outcome.error.slice(0, 200), lease_until: null }).where('id', '=', outboxId).execute();
     await appendAudit(tx, { type: 'send.ambiguous', actor: { kind: 'provider', ref: deps.provider.name }, subject: `outbox:${outboxId}`, payload: {} });

@@ -3,7 +3,31 @@
 # approved until Dan's approval is recorded (an auditable human approval, §71).
 # docs/PROCESSOR_REGISTER.md is generated from this file and config/egress.allowlist.yaml.
 #
-# Nothing is approved yet. Candidates awaiting ADRs: Twilio (SMS, §57), the hosting provider (Q-10),
-# an email provider (§55.3), Stripe or alternative (§55.4).
+# Approved: Brevo (email), by Dan on 28 October 2026.
+# Still to come: Twilio (SMS, §57), the hosting provider (Q-10), Stripe or alternative (§55.4).
 version: 1
-processors: []
+processors:
+  - id: brevo
+    name: Brevo (Sendinblue SAS)
+    role: processor
+    purpose: Transactional email to customers and owners (acknowledgements, approved replies, booking confirmations, data-request links)
+    data_categories: [recipient email address, message text, outbox reference]
+    data_locations:
+      - data: email content and logs
+        location: France (OVH) and Belgium (Google Cloud)
+        source: { url: "https://www.brevo.com/legal/termsofuse/", checked_on: "2026-10-21" }
+    sub_processors:
+      list_url: "https://www.brevo.com/legal/termsofuse/"
+      notice_days: 30
+      source: { url: "https://www.brevo.com/legal/termsofuse/", checked_on: "2026-10-21" }
+    terms:
+      dpa: Brevo Terms of Service, Appendix 3 (Data Processing Agreement), accepted with the account
+      terms_url: "https://www.brevo.com/legal/termsofuse/"
+    retention: Deleted within 3 months of termination on request, with written confirmation
+    transfer_mechanism: UK adequacy for the EEA; SCCs or the EU-US Data Privacy Framework for Cloudflare (USA) in front of the API
+    adr: docs/adr/providers/email-brevo.md
+    destination_test: null
+    review: { status: approved, reviewed_on: "2026-10-28", next_review: "2027-10-28" }
+    approval: { approved_by: "Dan Hadfield (founder, Veylith Systems)", approved_on: "2026-10-28", human_input_id: null }
+    unknowns:
+      - Does Cloudflare (USA) in the request path need naming in tenants' privacy notices, and is the UK-US data bridge enough? (counsel)

@@ -27,7 +27,7 @@ export interface AckDeps {
   readonly provider: OutboundProvider;
 }
 
-export type AckOutcome = 'sent' | 'suppressed' | 'opted_out' | 'blocked' | 'already' | 'no_channel' | 'failed' | 'ambiguous' | 'in_progress' | 'not_dispatchable' | 'already_sent';
+export type AckOutcome = 'deferred' | 'sent' | 'suppressed' | 'opted_out' | 'blocked' | 'already' | 'no_channel' | 'failed' | 'ambiguous' | 'in_progress' | 'not_dispatchable' | 'already_sent';
 
 /** Prepares the ACK inside the job's tenant transaction; dispatch happens after commit. */
 async function prepare(deps: AckDeps, tx: TenantTx, messageId: string): Promise<{ outboxId: string; replyId: string; receivedAt: number } | { outcome: AckOutcome }> {

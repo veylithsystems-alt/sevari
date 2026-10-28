@@ -9,7 +9,7 @@ import { LocalKeyFileKms } from '@sevari/crypto';
 import { connect, withTenant, type DbHandle } from '@sevari/db';
 import { authenticate, newOperatorToken, platformDecision } from '@sevari/identity';
 import { renderOwnerReport, sendWeeklyReport, weekStart, weeklyMetrics } from '@sevari/metrics';
-import { SloConfigSchema } from '@sevari/region';
+import { APPROVED_SLO_2026_10_21, SloConfigSchema, sloApproved, withServiceLevels } from '@sevari/region';
 import { contractSuite } from '../support/contract.ts';
 import { isolatedDatabase } from '../support/db.ts';
 import { draftFor, harness, type Harness } from '../support/hitl-harness.ts';
@@ -81,6 +81,14 @@ contractSuite('T-SLO', () => {
     await decide('counsel', 'region:uk:live_tenants');
     await decide('founder', 'region:uk:live_tenants');
     expect(await cellLiveStatus(deps)).toEqual({ allowed: true });
+  });
+
+  it('Dan\'s approved set (21 Oct 2026) is a valid set, and writing it keeps the file\'s comments and ACK target', async () => {
+    const text = withServiceLevels(await readFile(join(ROOT, 'config', 'slo.yaml'), 'utf8'), APPROVED_SLO_2026_10_21);
+    const slo = SloConfigSchema.parse((await import('yaml')).parse(text));
+    expect(sloApproved(slo)).toBe(true);
+    expect(slo).toMatchObject({ ...APPROVED_SLO_2026_10_21, ack_target_p95_ms: 10_000 });
+    expect(text).toMatch(/# monthly/);
   });
 
   it('the ACK target is stated with its percentile and conditions, including a slow provider (F7 measures it)', async () => {

@@ -5,4 +5,8 @@ version: 1
 default: deny
 cells:
   uk:
-    hosts: []
+    hosts:
+      - host: api.brevo.com
+        port: 443
+        processor: brevo
+        purpose: transactional email (ADR docs/adr/providers/email-brevo.md)

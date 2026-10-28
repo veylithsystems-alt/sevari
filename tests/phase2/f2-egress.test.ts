@@ -40,7 +40,11 @@ contractSuite('F2', () => {
       .filter((f) => !f.includes('/packages/egress/src/')); // the egress package only handles URLs passed to it
     const offenders: string[] = [];
     for (const f of files) {
-      for (const m of readFileSync(f, 'utf8').matchAll(/\b(?:https?|wss?):\/\/([a-z0-9.[\]:-]+)/gi)) {
+      // The processor registry cites its evidence (terms, DPA, sub-processor list) by URL: citations, not call targets.
+      const text = f.endsWith('config/processors.yaml')
+        ? readFileSync(f, 'utf8').split('\n').filter((l) => !/^\s*(?:url|list_url|terms_url):|source: \{ url:/.test(l)).join('\n')
+        : readFileSync(f, 'utf8');
+      for (const m of text.matchAll(/\b(?:https?|wss?):\/\/([a-z0-9.[\]:-]+)/gi)) {
         const host = m[1]!.toLowerCase().replace(/:\d+$/, '').replace(/\.+$/, '');
         if (!allowed.has(host) && !NON_ROUTABLE.test(host)) offenders.push(`${f.replace(ROOT + '/', '')}: ${host}`);
       }

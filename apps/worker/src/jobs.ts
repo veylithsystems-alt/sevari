@@ -79,7 +79,13 @@ export function workerHandlers(deps: WorkerDeps): { handlers: Record<string, Job
 
   const handlers: Record<string, JobHandler> = {
     [INBOUND_JOB]: inboundHandler(deps.db, { keyring: deps.keyring, clock: deps.clock, ...lc, ...(deps.model ? { model: deps.model } : {}) }),
-    [ACK_JOB]: { scoped: (scope, p) => sendAck(deps, scope, String(p['message_id'])) },
+    [ACK_JOB]: {
+      scoped: async (scope, p) => {
+        const r = await sendAck(deps, scope, String(p['message_id']));
+        if (r === 'deferred') throw new Error('provider asked us to send the acknowledgement later; nothing was sent');
+        return r;
+      },
+    },
     [RESPOND_JOB]: (tx, p) => respond(hitl, tx, String(p['enquiry_id'])),
     [SWEEP_JOB]: (tx) => sweep(hitl, tx),
     [TIMER_JOB]: (tx, p) => runTimer(hitl, tx, String(p['timer_id'])),
@@ -100,6 +106,7 @@ export function workerHandlers(deps: WorkerDeps): { handlers: Record<string, Job
         const grantId = p['grant_id'] ? String(p['grant_id']) : null;
         const result = await dispatch(deps, scope, outboxId);
         if (result === 'in_progress') throw new Error('send in progress elsewhere; retry later');
+        if (result === 'deferred') throw new Error('provider asked us to try later; nothing was sent');
         if (result === 'ambiguous') {
           await withTenant(deps.db, scope, (tx) => enqueue(tx, { kind: RECONCILE_JOB, dedupeKey: `reconcile:${outboxId}`, runAt: new Date(deps.clock.nowMs() + RECONCILE_AFTER_MS), payload: { outbox_id: outboxId, draft_id: draftId, input_id: inputId, grant_id: grantId } }));
         }
@@ -111,6 +118,7 @@ export function workerHandlers(deps: WorkerDeps): { handlers: Record<string, Job
       scoped: async (scope, p) => {
         const result = await dispatch(deps, scope, String(p['outbox_id']));
         if (result === 'in_progress') throw new Error('send in progress elsewhere; retry later');
+        if (result === 'deferred') throw new Error('provider asked us to try later; nothing was sent');
         return result;
       },
     },
@@ -123,6 +131,7 @@ export function workerHandlers(deps: WorkerDeps): { handlers: Record<string, Job
           // Send it now if it hasn't gone yet (dispatch is idempotent and lease-protected).
           const r = await dispatch(deps, scope, outboxId);
           if (r === 'in_progress') throw new Error('confirmation is being sent elsewhere; erase after it');
+          if (r === 'deferred') throw new Error('the provider asked us to send the confirmation later; erase after it');
           if (r === 'ambiguous') await reconcile(deps, scope, outboxId);
         }
         return withTenant(deps.db, scope, async (tx) => {

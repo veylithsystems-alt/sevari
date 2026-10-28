@@ -8,7 +8,7 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 
 ## For Dan: where things stand (plain English)
 
-**Last updated:** 21 October 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.13
+**Last updated:** 28 October 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.13
 
 **Status: build in progress.** Under contract Part J there are three separate milestones: *build-complete* (code and tests done), *production-approved* (deployment, recovery, security, support, legal documents all proven: [`docs/readiness/`](docs/readiness/README.md)), and *commercially launched* (pilots prove the product is worth paying for: the Value Gate). Passing automated tests is **not** evidence that Sevari is ready for paying customers.
 
@@ -22,7 +22,7 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 | 5 | The local AI models and how they're scored | ✅ Code done · **your step:** run the model benchmark on the VPS ([how](docs/ops/model-benchmark.md)) |
 | 18 → 6 | Your approvals: questions to you, one-tap approve, nothing sends without it, your inbox app | ✅ Done |
 | 7 | Privacy: erasure, data requests, retention, the consent record, key management | ✅ Done |
-| 8 | Measurements and weekly reports | ✅ Done · **your step:** approve the service levels (Q-20) |
+| 8 | Measurements and weekly reports | ✅ Done · service levels approved 21 Oct · **your step on the server:** record it with `scripts/approve-slo.ts` |
 | 9 | Bookings and the customer journey | ✅ Done |
 | 10 | Consent and contact rules (who may be messaged, and how) | Next |
 | 10+ | Missed-call texts, finance, complaints, offboarding, learning, hardening | Planned |
@@ -91,7 +91,7 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
   - A confirmation must state exactly the time that was held, so an edit can't quietly book a different time.
   - "Any update?" is answered from the booking itself. A cancellation always needs your tap, and approving it frees the time.
   - An hour after the job, Sevari asks you "Did it go ahead?", and your answer updates the customer's record.
-- Sevari can't connect to any outside service unless you've approved that supplier. This is enforced three ways: in the code, by a gatekeeper process, and by the server's firewall (proven by a test). The supplier list (processor register) is generated automatically and currently says: no suppliers approved yet.
+- Sevari can't connect to any outside service unless you've approved that supplier. This is enforced three ways: in the code, by a gatekeeper process, and by the server's firewall (proven by a test). The supplier list (processor register) is generated automatically and currently lists one approved supplier: Brevo, for email.
 
 **Your decisions of 14 October (contract v1.12, Part L):**
 - New businesses can go live within the hour: they answer the questions, an automatic checklist runs, and their own "go live" tap starts Sevari in "ask me first" mode. You only approve regulated trades.
@@ -105,6 +105,10 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 - **Self-improving knowledge**: questions Sevari can't answer become one question to the owner, old prices get re-checked, and disagreements with other systems become a proposal, never a silent change.
 - **Growth**: the free "How fast do you reply?" check, and referral rewards paid only after the new customer has paid twice.
 - How your original vision lines up with the contract: [`docs/reference/original-vision.md`](docs/reference/original-vision.md) §7.
+
+**Your decisions of 21 October:**
+- **Service levels: the recommended set.** Up 99.5% of the time, back within 4 hours, at most 24 hours of data lost, daily backups, a monthly restore drill. When the server is set up, you run one command with your founder login. It records your approval and fills in the settings together, so neither can exist without the other.
+- **Email: Brevo, approved 28 October.** Free for 300 emails a day, with the data held in France. The connection is built and tested. Only Brevo's sending address is unlocked; nothing else of theirs is reachable. Your steps before the first real email: create the Brevo account, switch off its AI, SMS and marketing features, verify the sending domain, and put the key in the server's secrets store ([checklist](docs/adr/providers/email-brevo.md)). A lost reply from Brevo is never re-sent blindly: a person checks, so customers never get duplicates. Addresses Brevo reports as blocked are never emailed again.
 
 **Things I found that you should know:**
 - Your old n8n build (v3.6 / v4.1) has 16 bugs I've written up in [`docs/reference/v4.1-behaviours.md`](docs/reference/v4.1-behaviours.md). The serious ones: the "tamper-proof" record could be changed without detection; an approval for one message could be used to send a different one; the approval page could run attacker-supplied code; the encryption step stored data unencrypted if its key was missing; and the erasure step failed with an error. The new build is designed so each of these can't happen, and has a test for each.
