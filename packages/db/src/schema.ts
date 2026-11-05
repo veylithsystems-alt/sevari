@@ -8,6 +8,7 @@ export interface RegionsTable extends Meta {
   name: string;
   counsel_signoff: unknown | null;
   signoff_expires_on: Date | null;
+  contact_rules: ColumnType<Record<string, unknown>, string | undefined, string>;
 }
 export interface TenantsTable extends Meta {
   id: Generated<string>;
@@ -240,6 +241,9 @@ export interface OutboxTable extends Meta {
   provider_message_id: string | null;
   last_error: string | null;
   reserved_at: Date;
+  initiative: Generated<'response' | 'proactive'>;
+  not_before: Date | null;
+  dispatched_at: Date | null;
   sent_at: Date | null;
 }
 export interface ReplyRecordsTable extends Meta {
@@ -497,6 +501,19 @@ export interface BookingsTable extends Meta, Tenant {
   confirmed_at: Date | null;
   closed_at: Date | null;
 }
+export interface LeadSourcesTable extends Meta, Tenant {
+  key: string;
+  tier: 'A' | 'B' | 'C' | 'D' | 'E';
+  type: string;
+  lawful_basis: string;
+  data_categories: string[];
+  acquired_from: string;
+  art14_notice_method: string | null;
+  retention_days: number;
+  counsel_signoff: ColumnType<Record<string, unknown> | null, string | null | undefined, string | null>;
+  enabled: Generated<boolean>;
+}
+export interface PurposeRulesTable extends Meta { tier: string; purpose: string; rule: 'allowed' | 'consent' | 'never'; note: string }
 type ViewOf<T> = { readonly [K in keyof T]: T[K] };
 export type MetricsEnquiryFlowView = ViewOf<{
   tenant_id: string; region: string; enquiry_id: string; received_at: Date; analysed_at: Date; route: string; intent: string; intent_source: string; abstained: boolean;
@@ -553,6 +570,8 @@ export interface Database {
   lifecycle_timers: LifecycleTimersTable;
   booking_offers: BookingOffersTable;
   bookings: BookingsTable;
+  lead_sources: LeadSourcesTable;
+  purpose_rules: PurposeRulesTable;
 }
 
 export type QuestionRow = Selectable<HumanQuestionsTable>;

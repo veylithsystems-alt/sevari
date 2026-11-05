@@ -14,10 +14,11 @@ import { createHash, randomUUID } from 'node:crypto';
 import { appendAudit } from '@sevari/audit';
 import type { Clock } from '@sevari/clock';
 import type { TenantKeyring } from '@sevari/crypto';
-import { lockOutbox, lockRecipient, withTenant, type Db, type TenantTx } from '@sevari/db';
+import { lockOutbox, lockRecipient, sql, withTenant, type Db, type TenantTx } from '@sevari/db';
 import { ContractViolation, normaliseEmail, normalisePhone, type TenantScope } from '@sevari/domain';
 import { isGroundedDraft, type GroundedDraft } from '@sevari/grounding';
 import type { OutboundProvider } from './provider.ts';
+import { checkSendPolicy, type PolicyRefusal, type PreferenceRegister } from './policy.ts';
 
 /** Classes that never auto-retry an ambiguous send (Part J §66, F50). */
 export const CONSEQUENTIAL = new Set(['payment_request', 'cancel', 'booking_change', 'refund', 'invoice_send', 'booking_create', 'quote_reply']);
@@ -33,11 +34,15 @@ export interface ReserveInput {
   readonly dedupeKey: string;
   readonly templateId?: string;
   readonly templateVersion?: string;
+  /** The cell's preference register (TPS, CTPS); none configured means anything needing one is refused. */
+  readonly register?: PreferenceRegister;
 }
 
 export type ReserveResult =
-  | { readonly status: 'reserved'; readonly outboxId: string; readonly created: boolean }
-  | { readonly status: 'suppressed'; readonly outboxId: string };
+  | { readonly status: 'reserved'; readonly outboxId: string; readonly created: boolean; readonly notBefore: Date | null }
+  | { readonly status: 'suppressed'; readonly outboxId: string }
+  /** The contact rules (§17.2) say no: recorded as blocked, with the reason, never sent. */
+  | { readonly status: 'refused'; readonly outboxId: string; readonly reason: PolicyRefusal };
 
 const field = (column: string, rowId: string) => ({ table: 'outbox', column, rowId });
 
@@ -57,13 +62,23 @@ async function isSuppressed(tx: TenantTx, channel: 'email' | 'sms', bidx: Buffer
 
 export async function reserve(tx: TenantTx, keyring: TenantKeyring, clock: Clock, input: ReserveInput): Promise<ReserveResult> {
   if (!isGroundedDraft(input.draft)) throw new ContractViolation('INV-5', 'only a grounded draft can be sent');
-  const existing = await tx.selectFrom('outbox').select(['id', 'state']).where('dedupe_key', '=', input.dedupeKey).executeTakeFirst();
-  if (existing) return existing.state === 'blocked' ? { status: 'suppressed', outboxId: existing.id } : { status: 'reserved', outboxId: existing.id, created: false };
+  const existing = await tx.selectFrom('outbox').select(['id', 'state', 'last_error', 'not_before']).where('dedupe_key', '=', input.dedupeKey).executeTakeFirst();
+  if (existing) {
+    if (existing.state !== 'blocked') return { status: 'reserved', outboxId: existing.id, created: false, notBefore: existing.not_before };
+    return existing.last_error?.startsWith('policy:') ? { status: 'refused', outboxId: existing.id, reason: existing.last_error.slice(7) as PolicyRefusal } : { status: 'suppressed', outboxId: existing.id };
+  }
 
   const to = normaliseRecipient(input.channel, input.recipient);
   const bidx = await recipientIndex(keyring, tx, input.channel, to);
   await lockRecipient(tx, bidx);
   const suppressed = await isSuppressed(tx, input.channel, bidx);
+  // The contact rules, under the same lock: provenance, tier, purpose, recipient class, registers, caps.
+  const policy = suppressed ? null : await checkSendPolicy(tx, clock, {
+    contactId: input.contactId, channel: input.channel, purpose: input.draft.purpose, recipient: to, body: input.draft.text,
+    ...(input.inReplyTo ? { inReplyTo: input.inReplyTo } : {}), ...(input.register ? { register: input.register } : {}),
+  });
+  const refused = policy && !policy.ok ? policy.reason : null;
+  const blocked = suppressed || refused !== null;
   const id = randomUUID();
   const bytes = Buffer.from(input.draft.text, 'utf8');
   await tx.insertInto('outbox').values({
@@ -72,13 +87,16 @@ export async function reserve(tx: TenantTx, keyring: TenantKeyring, clock: Clock
     dedupe_key: input.dedupeKey, recipient_enc: await keyring.seal(tx, { ...field('recipient_enc', id), subject: input.contactId }, to), recipient_bidx: bidx,
     body_enc: await keyring.seal(tx, { ...field('body_enc', id), subject: input.contactId }, bytes), body_digest: createHash('sha256').update(bytes).digest(),
     template_id: input.templateId ?? null, template_version: input.templateVersion ?? null,
-    reserved_at: clock.now(), ...(suppressed ? { state: 'blocked' as const, last_error: 'suppressed' } : {}),
+    reserved_at: clock.now(), initiative: policy?.initiative ?? 'response', not_before: policy?.ok ? policy.notBefore : null,
+    ...(blocked ? { state: 'blocked' as const, last_error: suppressed ? 'suppressed' : `policy:${refused}` } : {}),
   }).execute();
   await appendAudit(tx, {
-    type: suppressed ? 'send.suppressed' : 'send.reserved', actor: { kind: 'system' }, subject: `outbox:${id}`,
-    payload: { purpose: input.draft.purpose, channel: input.channel, action_class: input.actionClass, facts_used: input.draft.factsUsed.length },
+    type: suppressed ? 'send.suppressed' : refused ? 'send.refused' : 'send.reserved', actor: { kind: 'system' }, subject: `outbox:${id}`,
+    payload: { purpose: input.draft.purpose, channel: input.channel, action_class: input.actionClass, facts_used: input.draft.factsUsed.length, ...(refused ? { reason: refused } : {}), ...(policy?.ok && policy.notBefore ? { not_before: policy.notBefore.toISOString() } : {}) },
   });
-  return suppressed ? { status: 'suppressed', outboxId: id } : { status: 'reserved', outboxId: id, created: true };
+  if (suppressed) return { status: 'suppressed', outboxId: id };
+  if (refused) return { status: 'refused', outboxId: id, reason: refused };
+  return { status: 'reserved', outboxId: id, created: true, notBefore: policy?.ok ? policy.notBefore : null };
 }
 
 export type DispatchResult = 'sent' | 'already_sent' | 'in_progress' | 'suppressed' | 'failed' | 'ambiguous' | 'not_dispatchable' | 'deferred';
@@ -101,13 +119,15 @@ export async function dispatch(deps: DispatchDeps, scope: TenantScope, outboxId:
     if (row.state === 'sent') return { kind: 'done' as const, result: 'already_sent' as const };
     if (row.state === 'sending' && row.lease_until && row.lease_until.getTime() > deps.clock.nowMs()) return { kind: 'done' as const, result: 'in_progress' as const };
     if (row.state !== 'reserved') return { kind: 'done' as const, result: 'not_dispatchable' as const };
+    // Quiet hours (F13): a proactive message waits for the sending window, whoever asks to send it early.
+    if (row.not_before && row.not_before.getTime() > deps.clock.nowMs()) return { kind: 'done' as const, result: 'deferred' as const };
     await lockRecipient(tx, row.recipient_bidx);
     if (await isSuppressed(tx, row.channel as 'email' | 'sms', row.recipient_bidx)) {
       await tx.updateTable('outbox').set({ state: 'blocked', last_error: 'suppressed' }).where('id', '=', outboxId).execute();
       await appendAudit(tx, { type: 'send.suppressed', actor: { kind: 'system' }, subject: `outbox:${outboxId}`, payload: { at: 'dispatch' } });
       return { kind: 'done' as const, result: 'suppressed' as const };
     }
-    await tx.updateTable('outbox').set({ state: 'sending', attempts: row.attempts + 1, lease_until: new Date(deps.clock.nowMs() + (deps.leaseMs ?? 30_000)), provider: deps.provider.name })
+    await tx.updateTable('outbox').set({ state: 'sending', attempts: row.attempts + 1, lease_until: new Date(deps.clock.nowMs() + (deps.leaseMs ?? 30_000)), provider: deps.provider.name, dispatched_at: sql<Date>`clock_timestamp()` })
       .where('id', '=', outboxId).execute();
     const to = await deps.keyring.openText(tx, field('recipient_enc', outboxId), row.recipient_enc);
     const text = await deps.keyring.openText(tx, field('body_enc', outboxId), row.body_enc);

@@ -239,6 +239,6 @@ export async function holdingUpdate(deps: SendDeps, tx: TenantTx, draftId: strin
     draft: g.draft, conversationId: d.row.conversation_id, contactId: d.row.contact_id, ...(d.row.in_reply_to ? { inReplyTo: d.row.in_reply_to } : {}),
     channel: d.row.channel, recipient: d.recipient, actionClass: 'ack', dedupeKey: key, templateId: 'holding_update', templateVersion: r.version,
   });
-  if (res.status === 'reserved' && res.created) await enqueue(tx, { kind: OUTBOX_DISPATCH_JOB, dedupeKey: `dispatch:${res.outboxId}`, payload: { outbox_id: res.outboxId } });
+  if (res.status === 'reserved' && res.created) await enqueue(tx, { kind: OUTBOX_DISPATCH_JOB, dedupeKey: `dispatch:${res.outboxId}`, ...(res.notBefore ? { runAt: res.notBefore } : {}), payload: { outbox_id: res.outboxId } });
   return res.status === 'reserved' && res.created ? 'sent' : 'skipped';
 }

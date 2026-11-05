@@ -6,7 +6,8 @@ import type { Clock } from '@sevari/clock';
 import { registryGaps } from '@sevari/privacy';
 import { verifySignoff } from '@sevari/identity';
 import { loadLifecycles } from '@sevari/lifecycle';
-import { liveTenantStatus, loadRegionConfig, loadSloConfig, sloApproved } from '@sevari/region';
+import { canonicalJson } from '@sevari/domain';
+import { contactRulesFromConfig, liveTenantStatus, loadRegionConfig, loadSloConfig, sloApproved } from '@sevari/region';
 
 export interface BootCheck {
   readonly name: string;
@@ -78,6 +79,14 @@ export async function runBootChecks(deps: BootDeps): Promise<BootReport> {
     check('region.config', async () => {
       const cfg = await loadRegionConfig(deps.configDir, deps.region);
       return `${cfg.code}: counsel_signoff ${cfg.counsel_signoff ? 'recorded' : 'NULL (no live tenants)'}`;
+    }),
+    check('region.rules', async () => {
+      // §17.3: the contact rules the send gate enforces come from the database; they must match the rule pack.
+      const cfg = await loadRegionConfig(deps.configDir, deps.region);
+      const row = await deps.db.selectFrom('regions').select('contact_rules').where('code', '=', deps.region).executeTakeFirst();
+      if (!row) throw new Error(`region ${deps.region} is not registered in the database`);
+      if (canonicalJson(row.contact_rules) !== canonicalJson(contactRulesFromConfig(cfg))) throw new Error(`the database's contact rules for ${deps.region} differ from config/regions/${deps.region}.yaml: run scripts/sync-region.ts`);
+      return `${deps.region}: contact rules match the rule pack (tiers ${cfg.outbound_rules.tiers_enabled.join(', ')})`;
     }),
     check('signoffs', async () => {
       // §71: a sign-off in configuration must be backed by approval records (counsel and founder, unexpired).

@@ -23,6 +23,7 @@ contractSuite('T-BOOT', () => {
   beforeAll(async () => {
     iso = await isolatedDatabase();
     f = fixtures(iso);
+    await f.ensureRegion('uk'); // a cell's own region is registered when it is provisioned
     app = connect(iso.appUrl);
     deps = { db: app.db, kms, region: 'uk', configDir: join(ROOT, 'config'), egressPolicyPath: join(ROOT, 'config', 'egress.allowlist.yaml'), clock: new FixedClock(Date.parse('2026-10-14T09:00:00Z')) };
   });
@@ -33,11 +34,20 @@ contractSuite('T-BOOT', () => {
 
   const failing = async (d: BootDeps) => (await runBootChecks(d)).checks.filter((c) => !c.ok).map((c) => c.name);
 
+  it('refuses when the database\'s contact rules differ from the region\'s rule pack (§17.3)', async () => {
+    await f.ownerQuery(`UPDATE regions SET contact_rules = jsonb_set(contact_rules, '{tiers_enabled}', '["A","B","C"]') WHERE code = 'uk'`);
+    try {
+      expect(await failing(deps)).toEqual(['region.rules']);
+    } finally {
+      await f.ownerQuery(`UPDATE regions SET contact_rules = jsonb_set(contact_rules, '{tiers_enabled}', '["A","B"]') WHERE code = 'uk'`);
+    }
+  });
+
   it('starts when every check passes', async () => {
     const report = await assertBoot(deps);
     expect(report.ok).toBe(true);
     expect(report.checks.map((c) => c.name).sort()).toEqual(
-      ['db.migrations', 'db.role', 'db.rls', 'egress.policy', 'kms', 'region.config', 'lifecycles', 'registry.erasure', 'signoffs', 'slo'].sort());
+      ['db.migrations', 'db.role', 'db.rls', 'egress.policy', 'kms', 'region.config', 'region.rules', 'lifecycles', 'registry.erasure', 'signoffs', 'slo'].sort());
   });
 
   it('refuses when RLS is switched off on any table', async () => {

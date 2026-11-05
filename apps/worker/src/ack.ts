@@ -95,10 +95,11 @@ async function prepare(deps: AckDeps, tx: TenantTx, messageId: string): Promise<
   });
   const replyId = await recordReply(tx, {
     inboundMessageId: m.id, outboxId: r.outboxId, purpose, channel, generator: 'template', templateId, factsUsed: g.draft.factsUsed, factsMissing: [],
-    groundingOk: true, autonomyDecision: 'auto_ack', sendResult: r.status === 'suppressed' ? 'suppressed' : 'reserved',
+    groundingOk: true, autonomyDecision: 'auto_ack', sendResult: r.status === 'suppressed' ? 'suppressed' : r.status === 'refused' ? `blocked_policy:${r.reason}` : 'reserved',
     latencyMs: { received_to_reserved: deps.clock.nowMs() - receivedAt },
   });
   if (r.status === 'suppressed') return { outcome: 'suppressed' };
+  if (r.status === 'refused') return { outcome: 'blocked' };
   return { outboxId: r.outboxId, replyId, receivedAt };
 }
 

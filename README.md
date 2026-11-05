@@ -8,7 +8,7 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 
 ## For Dan: where things stand (plain English)
 
-**Last updated:** 28 October 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.13
+**Last updated:** 5 November 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.13
 
 **Status: build in progress.** Under contract Part J there are three separate milestones: *build-complete* (code and tests done), *production-approved* (deployment, recovery, security, support, legal documents all proven: [`docs/readiness/`](docs/readiness/README.md)), and *commercially launched* (pilots prove the product is worth paying for: the Value Gate). Passing automated tests is **not** evidence that Sevari is ready for paying customers.
 
@@ -24,8 +24,9 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 | 7 | Privacy: erasure, data requests, retention, the consent record, key management | ✅ Done |
 | 8 | Measurements and weekly reports | ✅ Done · service levels approved 21 Oct · **your step on the server:** record it with `scripts/approve-slo.ts` |
 | 9 | Bookings and the customer journey | ✅ Done |
-| 10 | Consent and contact rules (who may be messaged, and how) | Next |
-| 10+ | Missed-call texts, finance, complaints, offboarding, learning, hardening | Planned |
+| 10 | Consent and contact rules (who may be messaged, and how) | ✅ Done |
+| 11 | Onboarding: a business sets itself up and taps "go live" | Next |
+| 12+ | Missed-call texts, finance, complaints, offboarding, learning, hardening | Planned |
 | K1–K6 | **Agent Mode**: the seven agents (BASTION, SENTINEL, LEDGER, VANGUARD, HERALD, COMPASS, FORGE) as plug-in packs | Planned (after approvals are built) |
 
 **What's proven so far (each one is an automatic test that runs on every change):**
@@ -91,6 +92,14 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
   - A confirmation must state exactly the time that was held, so an edit can't quietly book a different time.
   - "Any update?" is answered from the booking itself. A cancellation always needs your tap, and approving it frees the time.
   - An hour after the job, Sevari asks you "Did it go ahead?", and your answer updates the customer's record.
+- **Every message passes the contact rules first**, in the same instant as the "asked to stop" check, so nothing can slip between the two:
+  - **Where they came from:** someone with no recorded source, or from a source that isn't switched on, can't be messaged. The database itself refuses it, even if the code had a bug.
+  - **What they agreed to:** an enquiry is an invitation to answer it, not to send marketing. Marketing needs a recorded "yes" for that purpose and channel, and the latest answer always wins.
+  - **Who they are:** sole traders, partnerships and anyone unknown are treated as individuals, so cold business-to-business outreach can never reach them. That outreach is switched off in the UK anyway until a lawyer signs off. Bought lists can't exist in the system at all.
+  - **Do-not-call registers:** a marketing text needs a clear check against the register. No register connected, or a listed number, means no.
+  - **When and how often:** messages Sevari starts itself wait until 07:30 if it's night, and are capped at 3 a week per person (marketing at 4 a month). Answers to people who wrote in go straight away, and an acknowledgement or safety message is never delayed.
+  - **Opt-outs win races:** tested 25 times with an opt-out and a send at the same moment. Nothing went out after the opt-out landed.
+  - These rules are settings in the UK rule pack, not code. The app refuses to start if its database copy of the rules doesn't match the rule pack.
 - Sevari can't connect to any outside service unless you've approved that supplier. This is enforced three ways: in the code, by a gatekeeper process, and by the server's firewall (proven by a test). The supplier list (processor register) is generated automatically and currently lists one approved supplier: Brevo, for email.
 
 **Your decisions of 14 October (contract v1.12, Part L):**
@@ -211,7 +220,7 @@ pnpm models:registry list|register|promote|retire   # owner role; promotion need
 - `contract-progress`: every contract test, red included, plus the status table. Informational.
 
 ### Contract test status
-Run `pnpm contract:status` for the live table. After Phases 6, 7, 8, 9 and 18: T-LC-1–4, T-BOOK-1–3, T-SLO, F5, T-KEY-1–4, F6, F8, T-RES, T-CHAOS, F22–F27, F46–F58 and T-SIGNOFF join F1 (database and API), F3 (grounding, property-based), F3H (holdout harness; starter cases only, DEV-009), F7 (ACK latency), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LLM, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
+Run `pnpm contract:status` for the live table. After Phases 6, 7, 8, 9, 10 and 18: F9–F13, T-LC-1–4, T-BOOK-1–3, T-SLO, F5, T-KEY-1–4, F6, F8, T-RES, T-CHAOS, F22–F27, F46–F58 and T-SIGNOFF join F1 (database and API), F3 (grounding, property-based), F3H (holdout harness; starter cases only, DEV-009), F7 (ACK latency), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LLM, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
 
 ### Documents
 - [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md): the binding contract (v1.13)

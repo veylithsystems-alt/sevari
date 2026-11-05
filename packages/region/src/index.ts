@@ -21,7 +21,12 @@ export const RegionConfigSchema = z.object({
   currency: z.string().length(3),
   counsel_signoff: CounselSignoff.nullable(),
   signoff_expires_on: z.string().date().nullable(),
-  messaging: z.object({ sending_window: z.object({ start: Hhmm, end: Hhmm }) }),
+  messaging: z.object({
+    sending_window: z.object({ start: Hhmm, end: Hhmm }),
+    // F13: per contact. Proactive = anything that isn't answering a message they sent.
+    caps: z.object({ proactive_per_7_days: z.number().int().min(0), marketing_per_30_days: z.number().int().min(0), responses_per_hour: z.number().int().min(1) })
+      .default({ proactive_per_7_days: 3, marketing_per_30_days: 4, responses_per_hour: 10 }),
+  }),
   outbound_rules: z.object({
     tiers_enabled: z.array(z.enum(['A', 'B', 'C', 'D', 'E', 'F'])),
     treat_as_individual: z.array(z.string()),
@@ -37,6 +42,18 @@ export const RegionConfigSchema = z.object({
   if (r.counsel_signoff && !r.signoff_expires_on) ctx.addIssue({ code: 'custom', message: 'A counsel sign-off needs an expiry date (§36.4)' });
 });
 export type RegionConfig = z.infer<typeof RegionConfigSchema>;
+
+/** The contact rules the cell's database must hold for this region (regions.contact_rules, §17.3). */
+export function contactRulesFromConfig(cfg: RegionConfig) {
+  return {
+    timezone: cfg.timezone,
+    sending_window: cfg.messaging.sending_window,
+    tiers_enabled: [...cfg.outbound_rules.tiers_enabled],
+    treat_as_individual: [...cfg.outbound_rules.treat_as_individual],
+    preference_registers: [...cfg.outbound_rules.preference_registers],
+    caps: cfg.messaging.caps,
+  };
+}
 
 export async function loadRegionConfig(configDir: string, code: string): Promise<RegionConfig> {
   const region = RegionCodeSchema.parse(code);

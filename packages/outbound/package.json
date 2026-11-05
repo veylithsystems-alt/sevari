@@ -10,6 +10,7 @@
     "@sevari/crypto": "workspace:*",
     "@sevari/db": "workspace:*",
     "@sevari/domain": "workspace:*",
-    "@sevari/grounding": "workspace:*"
+    "@sevari/grounding": "workspace:*",
+    "zod": "3.25.76"
   }
 }

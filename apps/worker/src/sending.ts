@@ -16,7 +16,7 @@ import type { TenantKeyring } from '@sevari/crypto';
 import { enqueue, type DraftRow, type TenantTx } from '@sevari/db';
 import { ground, type GroundingFailure, type GroundingSources } from '@sevari/grounding';
 import { snapshotAt } from '@sevari/knowledge';
-import { normaliseRecipient, reserve } from '@sevari/outbound';
+import { normaliseRecipient, reserve, type PolicyRefusal } from '@sevari/outbound';
 import { checkBookingDraft, commitBookingDraft, releaseForDraft } from './bookings.ts';
 import type { Lifecycles } from './journey.ts';
 
@@ -101,10 +101,10 @@ export type Authority =
   | { readonly kind: 'approval'; readonly inputId: string; readonly approverId: string }
   | { readonly kind: 'grant'; readonly grantId: string };
 
-export type SendRefusal = 'not_pending' | 'tampered' | 'stale_facts' | 'grounding' | 'approval' | 'suppressed' | 'booking_lost' | 'booking_changed';
+export type SendRefusal = 'not_pending' | 'tampered' | 'stale_facts' | 'grounding' | 'approval' | 'suppressed' | 'booking_lost' | 'booking_changed' | 'contact_rules';
 export type SendResult =
   | { readonly status: 'queued'; readonly outboxId: string }
-  | { readonly status: 'refused'; readonly reason: SendRefusal; readonly failures?: readonly GroundingFailure[] };
+  | { readonly status: 'refused'; readonly reason: SendRefusal; readonly failures?: readonly GroundingFailure[]; readonly rule?: PolicyRefusal };
 
 /** Extra evidence a human supplied (their own edited or written text), cited by the input that carried it. */
 export interface OwnerFacts { readonly texts: readonly string[]; readonly ids: readonly string[] }
@@ -163,10 +163,16 @@ export async function sendDraft(deps: SendDeps, tx: TenantTx, draftId: string, a
     await setStatus('blocked');
     return { status: 'refused', reason: 'suppressed' };
   }
+  if (r.status === 'refused') {
+    // The approval was consumed for nothing: record that the rules, not the person, stopped it.
+    await setStatus('blocked');
+    await appendAudit(tx, { type: 'draft.refused_by_contact_rules', actor: { kind: 'system' }, subject: `draft:${draftId}`, payload: { rule: r.reason } });
+    return { status: 'refused', reason: 'contact_rules', rule: r.reason };
+  }
   await tx.updateTable('drafts').set({ status: 'approved', outbox_id: r.outboxId }).where('id', '=', draftId).execute();
   // The business has now committed: the offer counts as made, the held slot becomes a booking (§24).
   await commitBookingDraft(deps, tx, d.row, approvalId ? { kind: 'approval', approvalId } : { kind: 'grant', grantId: (authority as { grantId: string }).grantId });
-  await enqueue(tx, { kind: DISPATCH_JOB, dedupeKey: `dispatch:${draftId}`, payload: { draft_id: draftId, outbox_id: r.outboxId, input_id: authority.kind === 'approval' && opts.receiptByDispatch !== false ? authority.inputId : null, grant_id: authority.kind === 'grant' ? authority.grantId : null } });
+  await enqueue(tx, { kind: DISPATCH_JOB, dedupeKey: `dispatch:${draftId}`, ...(r.notBefore ? { runAt: r.notBefore } : {}), payload: { draft_id: draftId, outbox_id: r.outboxId, input_id: authority.kind === 'approval' && opts.receiptByDispatch !== false ? authority.inputId : null, grant_id: authority.kind === 'grant' ? authority.grantId : null } });
   await appendAudit(tx, { type: 'draft.authorised', actor: authority.kind === 'approval' ? { kind: 'user', ref: authority.approverId } : { kind: 'system', ref: `grant:${authority.grantId}` }, subject: `draft:${draftId}`, payload: { authority: authority.kind, outbox_ref: `outbox:${r.outboxId}` } });
   return { status: 'queued', outboxId: r.outboxId };
 }
@@ -180,6 +186,7 @@ const REFUSAL_TEXT: Record<SendRefusal, string> = {
   suppressed: 'This customer has asked not to be contacted, so nothing was sent.',
   booking_lost: 'The time in this message is no longer held (it lapsed, or the booking changed), so nothing was sent. The customer has not been told anything.',
   booking_changed: 'A booking message must state the booked time exactly as it was held, so this version was not sent. Nothing was booked or changed.',
+  contact_rules: 'Not sent: the contact rules don\'t allow this message to this person (for example, no consent for it, or too many messages recently). Nothing was sent.',
 };
 export const refusalText = (r: SendRefusal) => REFUSAL_TEXT[r];
 

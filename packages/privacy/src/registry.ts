@@ -39,6 +39,8 @@ const enc = (dsar = true): ColumnEntry => ({ category: 'contact', erasure: 'dele
 export const ERASURE_REGISTRY: Readonly<Record<string, TableEntry>> = {
   regions: { purpose: 'cell configuration', lawfulBasis: 'n/a (no personal data)', category: 'none', retention: H(null, 'never'), erasure: 'none', columns: {} },
   model_registry: { purpose: 'model registry: which models a cell may use, with measured scores', lawfulBasis: 'n/a (no personal data)', category: 'none', retention: H(null, 'never'), erasure: 'none', columns: {} },
+  purpose_rules: { purpose: 'purpose limitation per source tier (§17.2)', lawfulBasis: 'n/a (no personal data)', category: 'none', retention: H(null, 'never'), erasure: 'none', columns: {} },
+  lead_sources: { purpose: 'register of where contacts come from (§17.1)', lawfulBasis: 'legal obligation (accountability)', category: 'none', retention: H(null, 'tenant_exit'), erasure: 'none', columns: {} },
   schema_migrations: { purpose: 'migration ledger', lawfulBasis: 'n/a (no personal data)', category: 'none', retention: H(null, 'never'), erasure: 'none', columns: {} },
   tenants: {
     purpose: 'tenant account', lawfulBasis: 'contract (Veylith as controller for tenant data)', category: 'contact',
