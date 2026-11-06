@@ -68,6 +68,9 @@ importers:
       '@sevari/metrics':
         specifier: workspace:*
         version: link:packages/metrics
+      '@sevari/onboarding':
+        specifier: workspace:*
+        version: link:packages/onboarding
       '@sevari/outbound':
         specifier: workspace:*
         version: link:packages/outbound
@@ -155,6 +158,9 @@ importers:
       '@sevari/intake':
         specifier: workspace:*
         version: link:../../packages/intake
+      '@sevari/onboarding':
+        specifier: workspace:*
+        version: link:../../packages/onboarding
       '@sevari/privacy':
         specifier: workspace:*
         version: link:../../packages/privacy
@@ -212,6 +218,9 @@ importers:
       '@sevari/metrics':
         specifier: workspace:*
         version: link:../../packages/metrics
+      '@sevari/onboarding':
+        specifier: workspace:*
+        version: link:../../packages/onboarding
       '@sevari/outbound':
         specifier: workspace:*
         version: link:../../packages/outbound
@@ -481,6 +490,45 @@ importers:
       '@sevari/hitl':
         specifier: workspace:*
         version: link:../hitl
+
+  packages/onboarding:
+    dependencies:
+      '@sevari/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@sevari/clock':
+        specifier: workspace:*
+        version: link:../clock
+      '@sevari/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@sevari/db':
+        specifier: workspace:*
+        version: link:../db
+      '@sevari/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@sevari/grounding':
+        specifier: workspace:*
+        version: link:../grounding
+      '@sevari/hitl':
+        specifier: workspace:*
+        version: link:../hitl
+      '@sevari/knowledge':
+        specifier: workspace:*
+        version: link:../knowledge
+      '@sevari/templates':
+        specifier: workspace:*
+        version: link:../templates
+      '@sevari/verticals':
+        specifier: workspace:*
+        version: link:../verticals
+      yaml:
+        specifier: 2.8.1
+        version: 2.8.1
+      zod:
+        specifier: 3.25.76
+        version: 3.25.76
 
   packages/outbound:
     dependencies:

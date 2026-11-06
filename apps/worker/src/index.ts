@@ -7,3 +7,4 @@ export * from './consumers.ts';
 export * from './jobs.ts';
 export * from './journey.ts';
 export * from './bookings.ts';
+export { askPackConfirm, requestGoLive, onboardingConsumers } from '@sevari/onboarding';

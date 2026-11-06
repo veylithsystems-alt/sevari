@@ -19,6 +19,9 @@ export interface TenantsTable extends Meta {
   is_house: Generated<boolean>;
   holding_update_enabled: Generated<boolean>;
   reply_due_minutes: Generated<number>;
+  regulated: Generated<boolean>;
+  regulated_reasons: Generated<string[]>;
+  activated_at: Date | null;
 }
 export interface TenantKeysTable extends Meta {
   id: Generated<string>;
@@ -115,6 +118,8 @@ export interface ChannelEndpointsTable extends Meta {
   purpose: string;
   allowed_origins: Generated<string[]>;
   status: Generated<'active' | 'disabled'>;
+  check_code_hash: Buffer | null;
+  verified_at: Date | null;
 }
 export interface ApiKeysTable extends Meta {
   id: Generated<string>;
@@ -322,7 +327,7 @@ export interface AutonomyGrantsTable extends Meta, Tenant {
   revoked_at: Date | null;
   revoke_reason: string | null;
 }
-export type QuestionKind = 'approve_draft' | 'clarify_edit' | 'owner_task' | 'autonomy_grant' | 'knowledge_update' | 'dsar_release' | 'lifecycle_step';
+export type QuestionKind = 'approve_draft' | 'clarify_edit' | 'owner_task' | 'autonomy_grant' | 'knowledge_update' | 'dsar_release' | 'lifecycle_step' | 'go_live' | 'pack_confirm';
 export type SafeDefault = 'hold' | 'reask' | 'escalate' | 'fail_closed';
 export interface HumanQuestionsTable extends Meta, Tenant {
   kind: QuestionKind;
@@ -514,6 +519,36 @@ export interface LeadSourcesTable extends Meta, Tenant {
   enabled: Generated<boolean>;
 }
 export interface PurposeRulesTable extends Meta { tier: string; purpose: string; rule: 'allowed' | 'consent' | 'never'; note: string }
+export interface TenantActivationsTable extends Meta, Tenant {
+  mode: 'active' | 'shadow';
+  checklist: ColumnType<unknown, string, never>;
+  checklist_ok: boolean;
+  input_id: string;
+  decided_by: string;
+  regulated: boolean;
+  platform_decision_id: string | null;
+  txid: ColumnType<string, never, never>;
+}
+export interface TenantPacksTable extends Meta, Tenant {
+  pack_version: number;
+  body: ColumnType<Record<string, unknown>, string, never>;
+  status: Generated<'draft' | 'confirmed' | 'superseded'>;
+  test_report: ColumnType<Record<string, unknown> | null, string | null | undefined, string | null>;
+  test_passed: Generated<boolean>;
+  confirmed_by: string | null;
+  confirmed_at: Date | null;
+}
+export interface DataImportsTable extends Meta, Tenant {
+  kind: 'contacts';
+  lawful_basis: string;
+  acquired_from: string;
+  imported_by: string;
+  rows_in: number;
+  rows_imported: number;
+  rows_rejected: number;
+  lead_source_key: string;
+  imported_at: Date;
+}
 type ViewOf<T> = { readonly [K in keyof T]: T[K] };
 export type MetricsEnquiryFlowView = ViewOf<{
   tenant_id: string; region: string; enquiry_id: string; received_at: Date; analysed_at: Date; route: string; intent: string; intent_source: string; abstained: boolean;
@@ -572,6 +607,9 @@ export interface Database {
   bookings: BookingsTable;
   lead_sources: LeadSourcesTable;
   purpose_rules: PurposeRulesTable;
+  tenant_activations: TenantActivationsTable;
+  tenant_packs: TenantPacksTable;
+  data_imports: DataImportsTable;
 }
 
 export type QuestionRow = Selectable<HumanQuestionsTable>;

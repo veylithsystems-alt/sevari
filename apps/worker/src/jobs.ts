@@ -28,6 +28,7 @@ import { inboundHandler, RESPOND_JOB, type ModelDeps } from './inbound.ts';
 import { EFFECT_JOB, TIMER_JOB } from '@sevari/lifecycle';
 import { releaseHold, RELEASE_HOLD_JOB } from './bookings.ts';
 import { journeyConsumers, runEffect, runTimer, type Lifecycles } from './journey.ts';
+import { onboardingConsumers, type CellLive } from '@sevari/onboarding';
 import { respond } from './respond.ts';
 import type { JobHandler } from './runner.ts';
 import { clockTime, DISPATCH_JOB, OUTBOX_DISPATCH_JOB, RECONCILE_JOB } from './sending.ts';
@@ -44,6 +45,8 @@ export interface WorkerDeps {
   readonly shredRegister?: ShredRegister;
   /** The cell's lifecycle definitions (§16); defaults to the build's own config/lifecycles. */
   readonly lifecycles?: Lifecycles;
+  /** Whether this cell may run live businesses (boot's cellLiveStatus). Without it, nobody can go live. */
+  readonly cellLive?: CellLive;
 }
 
 const RECONCILE_AFTER_MS = 60_000;
@@ -52,6 +55,7 @@ export function workerHandlers(deps: WorkerDeps): { handlers: Record<string, Job
   const lc = deps.lifecycles ? { lifecycles: deps.lifecycles } : {};
   const consumers = makeConsumers({ keyring: deps.keyring, clock: deps.clock, ...lc, ...(deps.publicBaseUrl ? { publicBaseUrl: deps.publicBaseUrl } : {}) });
   Object.assign(consumers, journeyConsumers({ keyring: deps.keyring, clock: deps.clock, ...lc }));
+  Object.assign(consumers, onboardingConsumers({ keyring: deps.keyring, clock: deps.clock, ...(deps.cellLive ? { cellLive: deps.cellLive } : {}) }));
   const hitl = { keyring: deps.keyring, clock: deps.clock, consumers, ...lc };
 
   /** Records the outcome of a draft send on the draft, the reply record and the human's receipt (§74.2). */

@@ -40,6 +40,9 @@ export const ERASURE_REGISTRY: Readonly<Record<string, TableEntry>> = {
   regions: { purpose: 'cell configuration', lawfulBasis: 'n/a (no personal data)', category: 'none', retention: H(null, 'never'), erasure: 'none', columns: {} },
   model_registry: { purpose: 'model registry: which models a cell may use, with measured scores', lawfulBasis: 'n/a (no personal data)', category: 'none', retention: H(null, 'never'), erasure: 'none', columns: {} },
   purpose_rules: { purpose: 'purpose limitation per source tier (§17.2)', lawfulBasis: 'n/a (no personal data)', category: 'none', retention: H(null, 'never'), erasure: 'none', columns: {} },
+  tenant_activations: { purpose: 'go-live decisions and their checklists (§18, §81)', lawfulBasis: 'legitimate interests (accountability)', category: 'none', retention: H(null, 'tenant_exit'), erasure: 'none', columns: {} },
+  tenant_packs: { purpose: 'each business\'s drafted and confirmed pack (§83.2)', lawfulBasis: 'contract', category: 'none', retention: H(null, 'tenant_exit'), erasure: 'none', columns: {} },
+  data_imports: { purpose: 'record of each data import and its lawful basis (§18)', lawfulBasis: 'legal obligation (accountability)', category: 'none', retention: H(2190, 'created'), erasure: 'none', columns: {} },
   lead_sources: { purpose: 'register of where contacts come from (§17.1)', lawfulBasis: 'legal obligation (accountability)', category: 'none', retention: H(null, 'tenant_exit'), erasure: 'none', columns: {} },
   schema_migrations: { purpose: 'migration ledger', lawfulBasis: 'n/a (no personal data)', category: 'none', retention: H(null, 'never'), erasure: 'none', columns: {} },
   tenants: {

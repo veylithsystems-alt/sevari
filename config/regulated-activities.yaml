@@ -1,0 +1,33 @@
+# Regulated activities (§83.4). A business whose onboarding answers or service names match one of these
+# is marked regulated, and going live then needs Veylith's approval as well as the owner's (§81.5).
+# This list is a starting point for counsel, who confirms it (Q-23). Matching ignores negated mentions
+# ("we don't do gas work") and only flags; it never refuses a business on its own.
+version: 1
+activities:
+  - id: gas
+    why: Gas work must be done by a Gas Safe registered engineer
+    terms: [gas safe, gas engineer, gas fitter, gas fitting, gas boiler, boiler installation, boiler service, boiler repair, gas appliance, gas hob, gas fire, gas leak, gas supply]
+  - id: electrical
+    why: Electrical installation work is notifiable (Part P) and is usually done by registered electricians
+    terms: [electrician, electrical installation, rewire, rewiring, consumer unit, fuse box, eicr, electrical certificate, ev charger installation]
+  - id: childcare
+    why: Childcare and childminding are registered with Ofsted, and involve children's data
+    terms: [childminder, childminding, childcare, nursery, after school club, babysitting, nanny, holiday club]
+  - id: health
+    why: Health and social care services are regulated (CQC and the professional regulators)
+    terms: [clinic, dentist, dental, physiotherapy, physiotherapist, chiropractor, osteopath, nurse, nursing, care home, home care, domiciliary care, medical, counselling, therapy sessions, pharmacy]
+  - id: legal
+    why: Reserved legal activities are regulated (SRA and others)
+    terms: [solicitor, conveyancing, legal advice, litigation, probate, immigration advice]
+  - id: finance
+    why: Financial advice, credit and insurance broking are FCA-regulated
+    terms: [financial advice, financial adviser, mortgage, mortgages, insurance broker, loans, credit broker, debt advice, pension advice, investment advice]
+  - id: waste
+    why: Carrying other people's waste needs an Environment Agency waste carrier registration
+    terms: [waste removal, rubbish removal, skip hire, waste carrier, house clearance, garden waste removal]
+  - id: lettings
+    why: Letting and property management are covered by client money and redress rules
+    terms: [letting agent, lettings, property management, estate agent, estate agency]
+  - id: security
+    why: Door supervision and security guarding need SIA licences
+    terms: [door supervisor, security guard, bouncer, cctv monitoring]

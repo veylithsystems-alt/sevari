@@ -21,6 +21,7 @@
     "@sevari/llm": "workspace:*",
     "@sevari/lifecycle": "workspace:*",
     "@sevari/metrics": "workspace:*",
+    "@sevari/onboarding": "workspace:*",
     "@sevari/outbound": "workspace:*",
     "@sevari/privacy": "workspace:*",
     "@sevari/templates": "workspace:*",

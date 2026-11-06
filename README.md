@@ -8,7 +8,7 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 
 ## For Dan: where things stand (plain English)
 
-**Last updated:** 5 November 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.13
+**Last updated:** 6 November 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.13
 
 **Status: build in progress.** Under contract Part J there are three separate milestones: *build-complete* (code and tests done), *production-approved* (deployment, recovery, security, support, legal documents all proven: [`docs/readiness/`](docs/readiness/README.md)), and *commercially launched* (pilots prove the product is worth paying for: the Value Gate). Passing automated tests is **not** evidence that Sevari is ready for paying customers.
 
@@ -25,7 +25,8 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 | 8 | Measurements and weekly reports | ✅ Done · service levels approved 21 Oct · **your step on the server:** record it with `scripts/approve-slo.ts` |
 | 9 | Bookings and the customer journey | ✅ Done |
 | 10 | Consent and contact rules (who may be messaged, and how) | ✅ Done |
-| 11 | Onboarding: a business sets itself up and taps "go live" | Next |
+| 11 | Onboarding: a business sets itself up and taps "go live" | ✅ Done (screens in the owner app come next) |
+| 12 | Invoices, payment links and chasing | Next |
 | 12+ | Missed-call texts, finance, complaints, offboarding, learning, hardening | Planned |
 | K1–K6 | **Agent Mode**: the seven agents (BASTION, SENTINEL, LEDGER, VANGUARD, HERALD, COMPASS, FORGE) as plug-in packs | Planned (after approvals are built) |
 
@@ -100,6 +101,14 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
   - **When and how often:** messages Sevari starts itself wait until 07:30 if it's night, and are capped at 3 a week per person (marketing at 4 a month). Answers to people who wrote in go straight away, and an acknowledgement or safety message is never delayed.
   - **Opt-outs win races:** tested 25 times with an opt-out and a send at the same moment. Nothing went out after the opt-out landed.
   - These rules are settings in the UK rule pack, not code. The app refuses to start if its database copy of the rules doesn't match the rule pack.
+- **Any service business can set itself up, with no setup call.**
+  - The owner answers the onboarding questions: their services in their own words, prices or "price on inspection", hours, the postcodes they cover, policies. Sevari turns the answers into records the owner checks and confirms.
+  - Window cleaners, dog groomers, anything: Sevari drafts a "pack" (the services and the words customers use for them) and tests it against practice enquiries before it can be used. Building this found and fixed a real gap: "please delete the personal data you hold about me" wasn't being recognised as a data request.
+  - **An automatic go-live checklist** says exactly what's still missing. A channel counts as working only after a test message with a one-time code comes through it.
+  - **Going live is the owner's own tap**, recorded as a decision. The database itself refuses any other way to switch a business on. The owner can choose practice mode first: Sevari drafts replies but sends nothing, and only the owner can end it.
+  - **Regulated work** (gas, electrical, childcare, health, legal, finance and others) is spotted in the owner's own words and needs your approval too. The owner can't remove the flag.
+  - A business that isn't live sends nothing to customers.
+  - **Importing old customer lists** needs a recorded lawful basis and where the data came from; without it nothing is imported. Imported people can only be messaged with their consent.
 - Sevari can't connect to any outside service unless you've approved that supplier. This is enforced three ways: in the code, by a gatekeeper process, and by the server's firewall (proven by a test). The supplier list (processor register) is generated automatically and currently lists one approved supplier: Brevo, for email.
 
 **Your decisions of 14 October (contract v1.12, Part L):**
@@ -159,6 +168,7 @@ packages/
   hitl/               structured questions, answers, acknowledgements, effect receipts, escalation sweep (§30, §74)
   identity/           tenant user and operator credentials, platform decisions, two-person sign-offs (§71, §82)
   privacy/            erasure registry, per-person crypto-erasure, data-rights requests and copies, consent ledger, retention reports, shred register, key drills
+  onboarding/         interview → records and a drafted pack, practice-enquiry tests, regulated-activity check, go-live checklist and activation, imports
   lifecycle/          the journey engine: lifecycles as data (config/lifecycles), validated; idempotent, audited, authority-checked transitions; timers
   metrics/            measurement views (row-level security applies), weekly owner report, the two must-be-zero floors
   llm/                model layer: provider port (Ollama via egress, VSAP stub, fake), versioned prompts, schema-checked tasks, registry selection, grounded model drafts
@@ -220,7 +230,7 @@ pnpm models:registry list|register|promote|retire   # owner role; promotion need
 - `contract-progress`: every contract test, red included, plus the status table. Informational.
 
 ### Contract test status
-Run `pnpm contract:status` for the live table. After Phases 6, 7, 8, 9, 10 and 18: F9–F13, T-LC-1–4, T-BOOK-1–3, T-SLO, F5, T-KEY-1–4, F6, F8, T-RES, T-CHAOS, F22–F27, F46–F58 and T-SIGNOFF join F1 (database and API), F3 (grounding, property-based), F3H (holdout harness; starter cases only, DEV-009), F7 (ACK latency), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LLM, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
+Run `pnpm contract:status` for the live table. After Phases 6–11 and 18: T-ONB-1–5, T-PACK-1–2, F9–F13, T-LC-1–4, T-BOOK-1–3, T-SLO, F5, T-KEY-1–4, F6, F8, T-RES, T-CHAOS, F22–F27, F46–F58 and T-SIGNOFF join F1 (database and API), F3 (grounding, property-based), F3H (holdout harness; starter cases only, DEV-009), F7 (ACK latency), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LLM, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
 
 ### Documents
 - [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md): the binding contract (v1.13)

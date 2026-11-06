@@ -1,0 +1,21 @@
+{
+  "name": "@sevari/onboarding",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@sevari/audit": "workspace:*",
+    "@sevari/clock": "workspace:*",
+    "@sevari/crypto": "workspace:*",
+    "@sevari/db": "workspace:*",
+    "@sevari/domain": "workspace:*",
+    "@sevari/grounding": "workspace:*",
+    "@sevari/hitl": "workspace:*",
+    "@sevari/knowledge": "workspace:*",
+    "@sevari/templates": "workspace:*",
+    "@sevari/verticals": "workspace:*",
+    "yaml": "2.8.1",
+    "zod": "3.25.76"
+  }
+}

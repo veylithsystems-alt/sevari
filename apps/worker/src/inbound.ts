@@ -15,6 +15,7 @@ import { enqueue, withTenant, type Db, type TenantTx } from '@sevari/db';
 import { analyseEnquiry, classifyIntent as classifyByRules, ContractViolation, sensitiveFlags, type BookingFact, type ModelIntent, type TenantScope, type VerticalPack, type KnowledgeSnapshot } from '@sevari/domain';
 import { snapshotAt } from '@sevari/knowledge';
 import { classifyIntent as classifyByModel, loadModelRegistry, selectModel, type LlmProvider, type ModelEntry, type ModelTrace } from '@sevari/llm';
+import { packOf } from '@sevari/onboarding';
 import { packFor } from '@sevari/verticals';
 import { busyTimes, upcomingBooking } from './bookings.ts';
 import { journeyEvent, type Lifecycles } from './journey.ts';
@@ -63,7 +64,9 @@ async function loadContext(deps: InboundDeps, tx: TenantTx, messageId: string): 
   const knowledge = await snapshotAt(tx, deps.keyring, nowMs);
   const vertical = knowledge.business?.body.vertical;
   if (!vertical) throw new ContractViolation('I5', 'tenant has no confirmed business record (vertical unknown)');
-  const pack = packFor(vertical);
+  // A business with its own drafted pack (§83.2) uses it once confirmed; otherwise its trade pack.
+  const pack = vertical === 'custom' ? await packOf(tx, knowledge) : packFor(vertical);
+  if (!pack) throw new ContractViolation('§83.2', 'this business has no confirmed pack yet');
   const timezone = knowledge.hours?.body.timezone ?? 'Europe/London';
   const clarificationsSoFar = (await tx.selectFrom('enquiries').select('id')
     .where('conversation_id', '=', msg.conversation_id).where('route', '=', 'clarify').execute()).length;

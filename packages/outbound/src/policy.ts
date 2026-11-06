@@ -9,6 +9,7 @@
  *   5. preference registers (F12): marketing by text needs a clear register check (unavailable = no);
  *   6. identity: marketing carries an unsubscribe route and the privacy link;
  *   7. frequency caps and quiet hours (F13): per contact; quiet hours delay, caps refuse.
+ * Before all of these: only a business that has gone live messages its customers (§81).
  * Answering someone who wrote in is a "response"; anything else is "proactive". Safety messages and
  * acknowledgements are never delayed or capped.
  */
@@ -40,7 +41,7 @@ export interface PreferenceRegister {
 export const NO_REGISTER: PreferenceRegister = { name: 'none', check: async () => 'unavailable' };
 
 export type PolicyRefusal =
-  | 'no_provenance' | 'tier_disabled' | 'purpose_not_allowed' | 'no_consent' | 'not_corporate'
+  | 'tenant_not_live' | 'no_provenance' | 'tier_disabled' | 'purpose_not_allowed' | 'no_consent' | 'not_corporate'
   | 'preference_register' | 'missing_identity' | 'frequency_cap';
 
 export type PolicyDecision =
@@ -67,6 +68,10 @@ const NEVER_DELAYED: ReadonlySet<Purpose> = new Set(['ack', 'safety']);
 export async function checkSendPolicy(tx: TenantTx, clock: Clock, p: PolicyInput): Promise<PolicyDecision> {
   const initiative: Initiative = p.purpose !== 'marketing' && p.inReplyTo ? 'response' : 'proactive';
   const no = (reason: PolicyRefusal): PolicyDecision => ({ ok: false, reason, initiative });
+
+  // 0. Only a live business messages its customers (§18, §81): not while onboarding, nor in shadow mode.
+  const t = await tx.selectFrom('tenants').select('status').where('id', '=', tx.scope.tenantId).executeTakeFirstOrThrow();
+  if (t.status !== 'active') return no('tenant_not_live');
 
   // 1. Provenance.
   const c = await tx.selectFrom('contacts').select(['source', 'lawful_basis', 'captured_at', 'captured_by', 'subscriber_type']).where('id', '=', p.contactId).executeTakeFirst();

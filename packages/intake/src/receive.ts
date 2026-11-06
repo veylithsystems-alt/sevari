@@ -4,7 +4,7 @@
  * Everything below happens in ONE tenant transaction, so a crash leaves either nothing or a complete,
  * queued message. Replays of the same provider message produce one message, one contact, one job.
  */
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { appendAudit } from '@sevari/audit';
 import { InboundParseError, type ChannelAdapter, type ChannelId, type InboundItem, type RawInbound } from '@sevari/channels';
 import type { Clock } from '@sevari/clock';
@@ -106,6 +106,8 @@ async function persist(deps: IntakeDeps, tx: TenantTx, endpointId: string, lawfu
     return { status: 'accepted', messageId: winner.id, duplicate: true };
   }
 
+  // Channel check (§81.2): a message carrying the endpoint's one-time code proves the channel works.
+  await checkChannelCode(tx, endpointId, `${item.subject ?? ''}\n${item.text}`, deps.clock.now());
   await enqueue(tx, { kind: ACK_JOB, dedupeKey: messageId, payload: { message_id: messageId } });
   await enqueue(tx, { kind: INBOUND_JOB, dedupeKey: messageId, payload: { message_id: messageId } });
   await appendAudit(tx, {
@@ -160,4 +162,14 @@ async function openConversation(tx: TenantTx, contactId: string): Promise<string
   const c = await tx.insertInto('conversations').values({ tenant_id: tx.scope.tenantId, region: tx.scope.region, contact_id: contactId })
     .returning('id').executeTakeFirstOrThrow();
   return c.id;
+}
+
+async function checkChannelCode(tx: TenantTx, endpointId: string, text: string, now: Date): Promise<void> {
+  const codes = text.match(/\bSV-\d{6}\b/g);
+  if (!codes) return;
+  const ep = await tx.selectFrom('channel_endpoints').select(['check_code_hash', 'verified_at']).where('id', '=', endpointId).executeTakeFirst();
+  if (!ep?.check_code_hash || ep.verified_at) return;
+  if (!codes.some((c) => createHash('sha256').update(c).digest().equals(ep.check_code_hash as Buffer))) return;
+  await tx.updateTable('channel_endpoints').set({ verified_at: now, check_code_hash: null }).where('id', '=', endpointId).execute();
+  await appendAudit(tx, { type: 'channel.verified', actor: { kind: 'system' }, subject: `endpoint:${endpointId}`, payload: {} });
 }

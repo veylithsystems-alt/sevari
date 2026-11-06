@@ -17,7 +17,7 @@ const RULES: ReadonlyArray<[SensitiveFlag, readonly string[]]> = [
   ['injury_or_damage', ['injured', 'injury', 'hurt myself', 'damaged my', 'damage to my', 'broke my', 'flooded my', 'ruined my', 'compensation']],
   ['discrimination', ['racist', 'racism', 'sexist', 'discriminated', 'discrimination', 'homophobic', 'disability discrimination']],
   ['media', ['journalist', 'newspaper', 'press', 'reporter', 'going to the papers', 'bbc', 'watchdog']],
-  ['data_rights', ['subject access', 'access request', 'delete my data', 'erase my data', 'my personal data', 'gdpr', 'data protection', 'what data you hold', 'right to be forgotten']],
+  ['data_rights', ['subject access', 'access request', 'delete my data', 'erase my data', 'my personal data', 'personal data', 'gdpr', 'data protection', 'what data you hold', 'data you hold', 'information you hold', 'details you hold', 'delete my details', 'delete my information', 'remove my data', 'remove my details', 'copy of my data', 'copy of my information', 'forget me', 'right to be forgotten']],
   ['vulnerable_customer', ['elderly', 'disabled', 'disability', 'wheelchair', 'carer', 'dementia', 'pregnant', 'newborn', 'bereaved', 'bereavement', 'passed away', 'terminally ill', 'hospital', 'mental health', 'struggling to pay', 'can\'t afford']],
   ['complaint', ['complaint', 'complain', 'not happy', 'unhappy', 'disappointed', 'terrible service', 'poor service', 'shoddy', 'refund', 'want my money back', 'money back', 'rip off', 'ripped off', 'still not fixed', 'came back worse', 'unacceptable', 'disgusted', 'worse than before']],
   ['opt_out', ['unsubscribe', 'stop texting', 'stop messaging', 'stop contacting', 'remove me', 'opt out', 'don\'t contact me', 'do not contact me', 'no more messages']],

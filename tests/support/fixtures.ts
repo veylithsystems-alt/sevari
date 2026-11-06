@@ -23,10 +23,15 @@ export function fixtures(urls: Urls = dbInfo()) {
     void (await ownerQuery('INSERT INTO regions (code, name) VALUES ($1, $2) ON CONFLICT (code) DO NOTHING', [code, name]));
   const appDb = (): DbHandle => connect(urls.appUrl);
   /** Creates a tenant the way the provisioning job does: as the app role, inside the new tenant's own scope. */
-  const newTenant = async (h: DbHandle, region = 'uk', name = 'Test Trades Ltd'): Promise<TenantScope> => {
+  const newTenant = async (h: DbHandle, region = 'uk', name = 'Test Trades Ltd', opts: { live?: boolean } = {}): Promise<TenantScope> => {
     await ensureRegion(region);
     const scope: TenantScope = { tenantId: tenantId(randomUUID()), region: regionCode(region) };
     await withTenant(h.db, scope, (tx) => tx.insertInto('tenants').values({ id: scope.tenantId, region: scope.region, display_name: name }).execute());
+    // Most tests need a business that is already live. Going live for real is a recorded human decision
+    // (Phase 11, T-ONB-1); a test fixture skips it as the database superuser, with triggers off.
+    if (opts.live !== false) {
+      await superQuery(`DO $$ BEGIN SET LOCAL session_replication_role = replica; UPDATE tenants SET status = 'active' WHERE id = '${scope.tenantId}'; END $$`);
+    }
     return scope;
   };
   return { ownerQuery, superQuery, ensureRegion, appDb, newTenant };
@@ -37,6 +42,6 @@ export const ownerQuery = (s: string, p: unknown[] = []) => fixtures().ownerQuer
 export const superQuery = (s: string, p: unknown[] = []) => fixtures().superQuery(s, p);
 export const ensureRegion = (code: string, name?: string) => fixtures().ensureRegion(code, name);
 export const appDb = () => fixtures().appDb();
-export const newTenant = (h: DbHandle, region?: string, name?: string) => fixtures().newTenant(h, region, name);
+export const newTenant = (h: DbHandle, region?: string, name?: string, opts?: { live?: boolean }) => fixtures().newTenant(h, region, name, opts);
 
 export const PROVENANCE = { source: 'web_form', lawful_basis: 'legitimate_interests_enquiry_response', captured_at: '2026-10-13T09:00:00Z', captured_by: 'intake:webform' } as const;

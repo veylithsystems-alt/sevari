@@ -16,7 +16,7 @@ import { ground } from '@sevari/grounding';
 import { snapshotAt } from '@sevari/knowledge';
 import { dispatch, recordReply, reserve, suppress, updateReplyResult, type OutboundProvider } from '@sevari/outbound';
 import { render, type TemplateId } from '@sevari/templates';
-import { packFor } from '@sevari/verticals';
+import { packOf } from '@sevari/onboarding';
 
 export { ACK_JOB } from '@sevari/intake';
 
@@ -64,7 +64,7 @@ async function prepare(deps: AckDeps, tx: TenantTx, messageId: string): Promise<
   const knowledge = await snapshotAt(tx, deps.keyring, deps.clock.nowMs());
   const business = knowledge.business;
   const templateId: TemplateId = flags.includes('risk_to_life') ? 'safety' : flags.some((f) => ALWAYS_HUMAN_FLAGS.has(f)) ? 'holding' : 'ack';
-  const pack = business ? packFor(business.body.vertical) : null;
+  const pack = business ? await packOf(tx, knowledge) : null;
   const rendered = business
     ? render(templateId, channel, {
       business: business.body.trading_name, replyTime: business.body.reply_time_statement, privacyUrl: business.body.privacy_notice_url,
