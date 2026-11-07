@@ -19,6 +19,8 @@ outbound_rules:
   # §17.2 / F11: unknown and sole traders/partnerships are individuals under PECR (UK).
   treat_as_individual: [unknown, individual, sole_trader, partnership]
   preference_registers: [TPS, CTPS]
+# §19.2: VAT standard rate (basis points) and default payment terms. Each business confirms its own VAT status.
+tax: { currency: GBP, vat_standard_rate_bp: 2000, payment_terms_days: 14 }
 retention_days:
   # All H (hypothesis) until counsel confirms (§27.7). Used only for scheduling, never to delete early.
   unanswered_call_events: 30

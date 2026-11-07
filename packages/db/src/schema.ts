@@ -9,6 +9,7 @@ export interface RegionsTable extends Meta {
   counsel_signoff: unknown | null;
   signoff_expires_on: Date | null;
   contact_rules: ColumnType<Record<string, unknown>, string | undefined, string>;
+  tax_rules: ColumnType<Record<string, unknown>, string | undefined, string>;
 }
 export interface TenantsTable extends Meta {
   id: Generated<string>;
@@ -22,6 +23,8 @@ export interface TenantsTable extends Meta {
   regulated: Generated<boolean>;
   regulated_reasons: Generated<string[]>;
   activated_at: Date | null;
+  money_mode: Generated<'direct' | 'platform_signed_off'>;
+  money_mode_signoff: string | null;
 }
 export interface TenantKeysTable extends Meta {
   id: Generated<string>;
@@ -549,6 +552,93 @@ export interface DataImportsTable extends Meta, Tenant {
   lead_source_key: string;
   imported_at: Date;
 }
+export type LedgerAccount = 'accounts_receivable' | 'revenue' | 'vat_output' | 'processor_clearing' | 'bank' | 'processor_fees' | 'refunds' | 'customer_credit' | 'bad_debt';
+export interface LedgerTransactionsTable extends Meta, Tenant {
+  kind: 'invoice' | 'payment' | 'fee' | 'refund' | 'credit_note' | 'payout' | 'write_off' | 'adjustment';
+  ref: string;
+  currency: string;
+  occurred_at: Date;
+  idempotency_key: string;
+}
+export interface LedgerEntriesTable extends Meta, Tenant {
+  transaction_id: string;
+  account: LedgerAccount;
+  direction: 'debit' | 'credit';
+  amount_minor: ColumnType<string, number | bigint | string, never>;
+  contact_id: string | null;
+  invoice_id: string | null;
+}
+export interface InvoiceCountersTable extends Meta { id: Generated<string>; tenant_id: string; region: string; next_number: Generated<number>; prefix: Generated<string> }
+export type InvoiceStatus = 'draft' | 'issued' | 'part_paid' | 'paid' | 'void' | 'credited';
+export interface InvoicesTable extends Meta, Tenant {
+  number: string | null;
+  contact_id: string | null;
+  booking_id: string | null;
+  kind: Generated<'invoice' | 'credit_note'>;
+  credits_invoice_id: string | null;
+  status: Generated<InvoiceStatus>;
+  currency: string;
+  vat_treatment: 'inclusive' | 'exclusive' | 'not_registered';
+  vat_rate_bp: number;
+  net_minor: ColumnType<string, number | string, never>;
+  vat_minor: ColumnType<string, number | string, never>;
+  total_minor: ColumnType<string, number | string, never>;
+  paid_minor: ColumnType<string, number | string | undefined, number | string>;
+  issued_at: Date | null;
+  due_on: ColumnType<string | null, string | null | undefined, string | null>;
+  facts_used: Generated<string[]>;
+  send_draft_id: string | null;
+}
+export interface InvoiceLinesTable extends Meta, Tenant {
+  invoice_id: string;
+  position: number;
+  description: string;
+  quantity: number;
+  unit_minor: ColumnType<string, number | string, never>;
+  amount_minor: ColumnType<string, number | string, never>;
+  source_ref: string | null;
+}
+export interface PaymentLinksTable extends Meta, Tenant {
+  invoice_id: string;
+  provider: string;
+  provider_link_id: string;
+  url: string;
+  amount_minor: ColumnType<string, number | string, never>;
+  currency: string;
+  status: Generated<'open' | 'paid' | 'expired' | 'cancelled'>;
+}
+export interface PaymentEventsTable extends Meta, Tenant {
+  provider: string;
+  provider_event_id: string;
+  kind: 'payment_succeeded' | 'payment_failed' | 'refund_succeeded' | 'fee' | 'payout';
+  invoice_id: string | null;
+  provider_payment_id: string | null;
+  amount_minor: ColumnType<string, number | string, never>;
+  fee_minor: ColumnType<string, number | string | undefined, never>;
+  currency: string;
+  occurred_at: Date;
+  ledger_transaction_id: string | null;
+}
+export interface ReconLinesTable extends Meta, Tenant {
+  source: 'processor' | 'bank';
+  external_id: string;
+  amount_minor: ColumnType<string, number | string, never>;
+  currency: string;
+  booked_on: ColumnType<string, string, never>;
+  reference: string | null;
+  payer_hint: string | null;
+  status: Generated<'unmatched' | 'matched' | 'suggested' | 'ignored'>;
+}
+export interface ReconMatchesTable extends Meta, Tenant {
+  line_id: string;
+  invoice_id: string | null;
+  rule: 'exact_reference' | 'amount_date_payer' | 'amount_date' | 'fuzzy';
+  confidence: ColumnType<string, number | string, never>;
+  outcome: 'matched' | 'partial' | 'overpayment' | 'underpayment' | 'duplicate' | 'unmatched';
+  evidence: ColumnType<Record<string, unknown>, string, never>;
+  status: 'auto_applied' | 'suggested' | 'confirmed' | 'rejected';
+  decided_by: string | null;
+}
 type ViewOf<T> = { readonly [K in keyof T]: T[K] };
 export type MetricsEnquiryFlowView = ViewOf<{
   tenant_id: string; region: string; enquiry_id: string; received_at: Date; analysed_at: Date; route: string; intent: string; intent_source: string; abstained: boolean;
@@ -610,6 +700,15 @@ export interface Database {
   tenant_activations: TenantActivationsTable;
   tenant_packs: TenantPacksTable;
   data_imports: DataImportsTable;
+  ledger_transactions: LedgerTransactionsTable;
+  ledger_entries: LedgerEntriesTable;
+  invoice_counters: InvoiceCountersTable;
+  invoices: InvoicesTable;
+  invoice_lines: InvoiceLinesTable;
+  payment_links: PaymentLinksTable;
+  payment_events: PaymentEventsTable;
+  recon_lines: ReconLinesTable;
+  recon_matches: ReconMatchesTable;
 }
 
 export type QuestionRow = Selectable<HumanQuestionsTable>;

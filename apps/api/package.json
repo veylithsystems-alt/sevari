@@ -20,6 +20,7 @@
     "@sevari/identity": "workspace:*",
     "@sevari/intake": "workspace:*",
     "@sevari/privacy": "workspace:*",
+    "@sevari/finance": "workspace:*",
     "@sevari/onboarding": "workspace:*",
     "@sevari/worker": "workspace:*",
     "fastify": "5.6.2",

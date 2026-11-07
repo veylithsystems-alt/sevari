@@ -1,7 +1,7 @@
 # Lifecycle T (§16): a tenant business and its own customer. Data, not code: change it here, the engine
 # validates it at start-up (states reachable, one step per state and event, all 12 stages covered).
 id: customer_journey
-version: 1
+version: 2
 lifecycle: T
 subject_type: customer
 description: A customer of a business using Sevari, from first message to repeat customer or exit.
@@ -25,8 +25,8 @@ states:
 stages:
   "5":  { automatic: "The customer record, consent and preferences are captured when the first message arrives (intake, §17.2)." }
   "7":  { automatic: "Questions, changes and rebooking are answered from the business's records at any point in the journey." }
-  "8":  { human: "Invoices: the owner sends them until the finance phase (Phase 12) automates invoicing." }
-  "9":  { human: "Matching payments to invoices: the owner, until the finance phase (Phase 12)." }
+  "8":  { automatic: "Invoices are drafted from the confirmed price when the job is done, with a payment link, and sent on the owner's approval; reminders follow the owner's chasing settings (§19.2)." }
+  "9":  { automatic: "Payments are matched to invoices: exact matches automatically, everything else as a suggestion for the owner (§19.3)." }
 
 transitions:
   - { from: [new, completed, missed, dormant, lost, cancelled], event: enquiry_received, to: engaged }
@@ -47,7 +47,7 @@ transitions:
             - { event: job_missed, label: "No, it didn't happen" }
           deadline_hours: 168
           safe_default_text: Nothing changes until you answer.
-  - { from: [awaiting_outcome], event: job_done, to: completed, effects: [{ set_booking_status: completed }] }
+  - { from: [awaiting_outcome], event: job_done, to: completed, effects: [{ set_booking_status: completed }, { prepare_invoice: true }] }
   - { from: [awaiting_outcome], event: job_missed, to: missed, effects: [{ set_booking_status: no_show }] }
   - { from: [completed], event: went_quiet, to: dormant }
   - { from: [missed], event: went_quiet, to: lost }

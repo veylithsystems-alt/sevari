@@ -6,8 +6,8 @@
 import { smsEncoding } from './sms.ts';
 
 export type TemplateChannel = 'email' | 'sms' | 'webform' | 'api';
-export type TemplateId = 'ack' | 'safety' | 'holding' | 'clarify' | 'reply' | 'holding_update' | 'dsar_ready' | 'erasure_done' | 'booking_confirm' | 'booking_moved' | 'booking_cancelled';
-export const TEMPLATE_VERSION = 'tpl-0.6.0';
+export type TemplateId = 'ack' | 'safety' | 'holding' | 'clarify' | 'reply' | 'holding_update' | 'dsar_ready' | 'erasure_done' | 'booking_confirm' | 'booking_moved' | 'booking_cancelled' | 'invoice' | 'invoice_reminder';
+export const TEMPLATE_VERSION = 'tpl-0.7.0';
 
 export interface TemplateValues {
   readonly business: string;
@@ -23,6 +23,8 @@ export interface TemplateValues {
   readonly link?: string;
   /** For booking messages: the slot, in the one canonical wording (slotPhrase). */
   readonly slot?: string;
+  /** For invoice messages: values from the issued invoice record only (§19.2). */
+  readonly invoice?: { readonly service: string; readonly total: string; readonly vatNote: string; readonly link?: string; readonly number?: string; readonly dueOn?: string };
 }
 
 export type RenderResult =
@@ -42,12 +44,14 @@ export function render(id: TemplateId, channel: TemplateChannel, v: TemplateValu
   if (id === 'reply' && !v.sections?.length) return { ok: false, reason: 'missing value: sections' };
   if (id === 'dsar_ready' && !v.link) return { ok: false, reason: 'missing value: link' };
   if ((id === 'booking_confirm' || id === 'booking_moved' || id === 'booking_cancelled') && !v.slot) return { ok: false, reason: 'missing value: slot' };
+  if ((id === 'invoice' || id === 'invoice_reminder') && !v.invoice) return { ok: false, reason: 'missing value: invoice' };
+  if (id === 'invoice_reminder' && (!v.invoice?.number || !v.invoice.dueOn)) return { ok: false, reason: 'missing value: invoice number or due date' };
   const sms = channel === 'sms';
   if (sms && v.business.length > MAX_BUSINESS_SMS) return { ok: false, reason: `business name longer than ${MAX_BUSINESS_SMS} characters for SMS` };
   const auto = v.discloseAutomation ? (sms ? ' This is an automatic reply.' : ' This is an automatic reply.') : '';
   const optOut = sms ? ' Reply STOP to opt out.' : '';
   // The privacy link goes with the first message (the acknowledgement); replies don't repeat it.
-  const privacy = id === 'reply' || id === 'holding_update' || id === 'clarify' || id === 'erasure_done' || id.startsWith('booking_') ? '' : sms ? ` Privacy: ${v.privacyUrl}` : `\n\nHow we use your information: ${v.privacyUrl}`;
+  const privacy = id === 'reply' || id === 'holding_update' || id === 'clarify' || id === 'erasure_done' || id.startsWith('booking_') || id.startsWith('invoice') ? '' : sms ? ` Privacy: ${v.privacyUrl}` : `\n\nHow we use your information: ${v.privacyUrl}`;
   const greet = sms ? '' : 'Hello,\n\n';
   const sign = sms ? '' : `\n\n${v.business}`;
 
@@ -99,6 +103,22 @@ export function render(id: TemplateId, channel: TemplateChannel, v: TemplateValu
         ? `${v.business}: as you asked, your booking for ${v.slot} has been cancelled.${auto}`
         : `${greet}As you asked, your booking for ${v.slot} has been cancelled.\n\nIf you would like to book again, just reply to this message.${auto}`;
       break;
+    case 'invoice': {
+      const i = v.invoice;
+      const pay = i?.link ? (sms ? ` Pay securely: ${i.link}` : `\n\nYou can pay securely here: ${i.link}`) : (sms ? ' Reply with any questions about paying.' : '\n\nIf you have any questions about paying, just reply to this message.');
+      body = sms
+        ? `${v.business}: thank you. Your invoice for ${i?.service} is ${i?.total}${i?.vatNote}.${pay}${auto}`
+        : `${greet}Thank you for choosing ${v.business}. Your invoice for ${i?.service} is ${i?.total}${i?.vatNote}.${pay}${auto}`;
+      break;
+    }
+    case 'invoice_reminder': {
+      const i = v.invoice;
+      const pay = i?.link ? (sms ? ` Pay: ${i.link}` : `\n\nYou can pay securely here: ${i.link}`) : '';
+      body = sms
+        ? `${v.business}: a reminder that invoice ${i?.number} for ${i?.total} was due on ${i?.dueOn}.${pay}${auto}`
+        : `${greet}A friendly reminder that invoice ${i?.number} for ${i?.total} was due on ${i?.dueOn}.${pay}\n\nIf you've already paid, thank you, and please ignore this message.${auto}`;
+      break;
+    }
     case 'holding_update':
       body = sms
         ? `${v.business}: thanks for waiting. We are still looking at your enquiry and a member of the team will be in touch shortly.${auto}`

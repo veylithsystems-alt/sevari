@@ -13,7 +13,7 @@ import { join, resolve } from 'node:path';
 import { parse } from 'yaml';
 import type { Clock } from '@sevari/clock';
 import type { TenantKeyring } from '@sevari/crypto';
-import type { TenantTx } from '@sevari/db';
+import { enqueue, type TenantTx } from '@sevari/db';
 import { ContractViolation, slotPhrase } from '@sevari/domain';
 import { ask, digestOf, notify, ownerOf, type Consumer, type ConsumerRegistry } from '@sevari/hitl';
 import { snapshotAt } from '@sevari/knowledge';
@@ -111,6 +111,11 @@ export async function runEffect(deps: JourneyDeps & { readonly consumers: Consum
     if (!bookingId) return 'no_booking';
     await tx.updateTable('bookings').set({ status: effect.set_booking_status, closed_at: deps.clock.now() }).where('id', '=', bookingId).where('status', '=', 'confirmed').execute();
     return `booking_${effect.set_booking_status}`;
+  }
+  if ('prepare_invoice' in effect) {
+    if (!bookingId) return 'no_booking';
+    await enqueue(tx, { kind: 'invoice.prepare', dedupeKey: `invoice:${bookingId}`, payload: { booking_id: bookingId } });
+    return 'invoice_queued';
   }
   const owner = await ownerOf(tx);
   if (!owner) throw new ContractViolation('§82', 'tenant has no active owner');

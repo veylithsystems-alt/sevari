@@ -13,6 +13,7 @@ import { answer, sweep, type AnswerInput } from '@sevari/hitl';
 import { createEndpoint, receiveInbound, type IntakeDeps } from '@sevari/intake';
 import { confirmRecord, proposeRecord } from '@sevari/knowledge';
 import { FakeProvider } from '@sevari/outbound';
+import type { PaymentProcessor } from '@sevari/finance';
 import { processInbound, respond, runOnce, sendAck, workerHandlers, type RunnerDeps } from '@sevari/worker';
 import { KNOWLEDGE } from '../../eval/fixtures/knowledge.ts';
 import { dbInfo } from './db.ts';
@@ -42,7 +43,7 @@ export interface Harness {
   close(): Promise<void>;
 }
 
-export async function harness(region: string, seedByte: number, provider: FakeProvider = new FakeProvider(), trade = 'drainage'): Promise<Harness> {
+export async function harness(region: string, seedByte: number, provider: FakeProvider = new FakeProvider(), trade = 'drainage', opts: { payments?: PaymentProcessor } = {}): Promise<Harness> {
   const clock = new FixedClock(Date.parse('2026-10-14T09:00:00Z'));
   const keyring = new TenantKeyring(LocalKeyFileKms.fromKey(Buffer.alloc(32, seedByte)));
   const h = appDb();
@@ -66,7 +67,7 @@ export async function harness(region: string, seedByte: number, provider: FakePr
   const viewer = await user('viewer', 'Vic Viewer');
   const ep = await withTenant(h.db, t, (tx) => createEndpoint(tx, keyring, { channel: 'email', lawfulBasis: 'legitimate_interests_enquiry_response', purpose: 'enquiries' }, 'user:owner'));
   const intake: IntakeDeps = { db: h.db, keyring, clock, cellRegion: regionCode(region), cellUrls: {}, adapters: { email: signedWebhookAdapter('email'), webform: webformAdapter, sms: smsAdapter(FakeSmsProvider) } };
-  const deps = workerHandlers({ db: h.db, keyring, clock, provider, publicBaseUrl: 'https://uk.sevari.example' });
+  const deps = workerHandlers({ db: h.db, keyring, clock, provider, publicBaseUrl: 'https://uk.sevari.example', ...(opts.payments ? { payments: opts.payments } : {}) });
   const queue = workerQueue(dbInfo().workerUrl, regionCode(region));
   const runner: RunnerDeps = { queue, db: h.db, clock, workerId: `w-${region}`, handlers: deps.handlers, concurrency: 1 };
   const hitl = { keyring, clock, consumers: deps.consumers };

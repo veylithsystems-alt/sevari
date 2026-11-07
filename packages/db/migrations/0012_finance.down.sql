@@ -1,0 +1,17 @@
+DROP TABLE IF EXISTS recon_matches;
+DROP TABLE IF EXISTS recon_lines;
+DROP TABLE IF EXISTS payment_events;
+DROP TABLE IF EXISTS payment_links;
+DROP TABLE IF EXISTS invoice_lines;
+DROP TABLE IF EXISTS invoices;
+DROP FUNCTION IF EXISTS sevari_meta.invoices_issued_immutable();
+DROP TABLE IF EXISTS invoice_counters;
+DROP TABLE IF EXISTS ledger_entries;
+DROP TABLE IF EXISTS ledger_transactions;
+DROP FUNCTION IF EXISTS sevari_meta.ledger_balanced();
+DROP TRIGGER IF EXISTS tenants_money_guard ON tenants;
+DROP FUNCTION IF EXISTS sevari_meta.tenants_money_guard();
+ALTER TABLE tenants DROP CONSTRAINT IF EXISTS tenants_money_mode_signed;
+ALTER TABLE tenants DROP COLUMN IF EXISTS money_mode_signoff;
+ALTER TABLE tenants DROP COLUMN IF EXISTS money_mode;
+ALTER TABLE regions DROP COLUMN IF EXISTS tax_rules;

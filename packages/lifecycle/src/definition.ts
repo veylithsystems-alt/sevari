@@ -54,7 +54,9 @@ const AskOwner = z.object({
 }).strict();
 const NotifyOwner = z.object({ notify_owner: z.object({ text: z.string().min(1) }).strict() }).strict();
 const BookingStatus = z.object({ set_booking_status: z.enum(['completed', 'no_show']) }).strict();
-export const Effect = z.union([AskOwner, NotifyOwner, BookingStatus]);
+/** Draft the invoice for the job (§19.2): from the owner's confirmed price, sent only on approval. */
+const PrepareInvoice = z.object({ prepare_invoice: z.literal(true) }).strict();
+export const Effect = z.union([AskOwner, NotifyOwner, BookingStatus, PrepareInvoice]);
 export type Effect = z.infer<typeof Effect>;
 
 const Transition = z.object({

@@ -8,7 +8,7 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 
 ## For Dan: where things stand (plain English)
 
-**Last updated:** 6 November 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.13
+**Last updated:** 7 November 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.13
 
 **Status: build in progress.** Under contract Part J there are three separate milestones: *build-complete* (code and tests done), *production-approved* (deployment, recovery, security, support, legal documents all proven: [`docs/readiness/`](docs/readiness/README.md)), and *commercially launched* (pilots prove the product is worth paying for: the Value Gate). Passing automated tests is **not** evidence that Sevari is ready for paying customers.
 
@@ -26,7 +26,8 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 | 9 | Bookings and the customer journey | ✅ Done |
 | 10 | Consent and contact rules (who may be messaged, and how) | ✅ Done |
 | 11 | Onboarding: a business sets itself up and taps "go live" | ✅ Done (screens in the owner app come next) |
-| 12 | Invoices, payment links and chasing | Next |
+| 12 | Invoices, payment links and chasing | ✅ Done (real payment provider awaits your choice, Q-24) |
+| 13 | Billing for Sevari itself (subscriptions), and accounting software sync | Next |
 | 12+ | Missed-call texts, finance, complaints, offboarding, learning, hardening | Planned |
 | K1–K6 | **Agent Mode**: the seven agents (BASTION, SENTINEL, LEDGER, VANGUARD, HERALD, COMPASS, FORGE) as plug-in packs | Planned (after approvals are built) |
 
@@ -109,6 +110,14 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
   - **Regulated work** (gas, electrical, childcare, health, legal, finance and others) is spotted in the owner's own words and needs your approval too. The owner can't remove the flag.
   - A business that isn't live sends nothing to customers.
   - **Importing old customer lists** needs a recorded lawful basis and where the data came from; without it nothing is imported. Imported people can only be messaged with their consent.
+- **Invoices and money, without ever holding money.**
+  - When the owner confirms a job is done, Sevari drafts the invoice from their confirmed price (or asks the amount if the price wasn't fixed), with a payment link from the business's own payment account, and asks the owner to approve it. The invoice only gets its number, and only counts, once approved.
+  - VAT follows the owner's own VAT status; the AI never works out money.
+  - **Every penny goes through a double-entry ledger** that always balances. The database refuses anything unbalanced and nothing in it can be changed or deleted. Corrections are new entries.
+  - **Payments are recorded once**, however many times the payment provider reports them.
+  - **Payments are matched to invoices automatically only when certain** (the invoice number is on the payment, or an exact amount from the right person). Anything less certain is suggested to the owner, never applied.
+  - Reminders after the due date are drafted for the owner to approve. No interest or charges are ever added unless the owner's records say so.
+  - **Sevari never holds, pools or moves customers' money.** The "platform" money mode is built but locked: only Veylith can switch it on, and only with a lawyer's sign-off.
 - Sevari can't connect to any outside service unless you've approved that supplier. This is enforced three ways: in the code, by a gatekeeper process, and by the server's firewall (proven by a test). The supplier list (processor register) is generated automatically and currently lists one approved supplier: Brevo, for email.
 
 **Your decisions of 14 October (contract v1.12, Part L):**
@@ -168,6 +177,7 @@ packages/
   hitl/               structured questions, answers, acknowledgements, effect receipts, escalation sweep (§30, §74)
   identity/           tenant user and operator credentials, platform decisions, two-person sign-offs (§71, §82)
   privacy/            erasure registry, per-person crypto-erasure, data-rights requests and copies, consent ledger, retention reports, shred register, key drills
+  finance/            VAT, double-entry ledger, invoices, the money port (Mode 1; Mode 2 locked), payment events, reconciliation
   onboarding/         interview → records and a drafted pack, practice-enquiry tests, regulated-activity check, go-live checklist and activation, imports
   lifecycle/          the journey engine: lifecycles as data (config/lifecycles), validated; idempotent, audited, authority-checked transitions; timers
   metrics/            measurement views (row-level security applies), weekly owner report, the two must-be-zero floors
@@ -230,7 +240,7 @@ pnpm models:registry list|register|promote|retire   # owner role; promotion need
 - `contract-progress`: every contract test, red included, plus the status table. Informational.
 
 ### Contract test status
-Run `pnpm contract:status` for the live table. After Phases 6–11 and 18: T-ONB-1–5, T-PACK-1–2, F9–F13, T-LC-1–4, T-BOOK-1–3, T-SLO, F5, T-KEY-1–4, F6, F8, T-RES, T-CHAOS, F22–F27, F46–F58 and T-SIGNOFF join F1 (database and API), F3 (grounding, property-based), F3H (holdout harness; starter cases only, DEV-009), F7 (ACK latency), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LLM, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
+Run `pnpm contract:status` for the live table. After Phases 6–12 and 18: F14–F18, T-ONB-1–5, T-PACK-1–2, F9–F13, T-LC-1–4, T-BOOK-1–3, T-SLO, F5, T-KEY-1–4, F6, F8, T-RES, T-CHAOS, F22–F27, F46–F58 and T-SIGNOFF join F1 (database and API), F3 (grounding, property-based), F3H (holdout harness; starter cases only, DEV-009), F7 (ACK latency), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LLM, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
 
 ### Documents
 - [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md): the binding contract (v1.13)
@@ -241,6 +251,7 @@ Run `pnpm contract:status` for the live table. After Phases 6–11 and 18: T-ONB
 - [`docs/privacy/backups-and-erasure.md`](docs/privacy/backups-and-erasure.md): how erasure reaches backups
 - [`docs/reports/baseline-v1.md`](docs/reports/baseline-v1.md): the first measured baseline (Phase 8)
 - [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md): what's needed for pilots, for launch, or deferred
+- [`docs/IMPROVEMENTS.md`](docs/IMPROVEMENTS.md): every improvement found while building, and how it was built in
 - [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md): every difference from the contract, with reasons
 - [`docs/QUESTIONS_FOR_DAN.md`](docs/QUESTIONS_FOR_DAN.md): open decisions
 - [`docs/reference/original-vision.md`](docs/reference/original-vision.md): your original Synchronicity / Operion vision mapped to the contract

@@ -46,6 +46,7 @@
     "@sevari/llm": "workspace:*",
     "@sevari/lifecycle": "workspace:*",
     "@sevari/metrics": "workspace:*",
+    "@sevari/finance": "workspace:*",
     "@sevari/onboarding": "workspace:*",
     "@sevari/outbound": "workspace:*",
     "@sevari/privacy": "workspace:*",

@@ -18,6 +18,7 @@ import { ground, type GroundingFailure, type GroundingSources } from '@sevari/gr
 import { snapshotAt } from '@sevari/knowledge';
 import { normaliseRecipient, reserve, type PolicyRefusal } from '@sevari/outbound';
 import { checkBookingDraft, commitBookingDraft, releaseForDraft } from './bookings.ts';
+import { checkInvoiceDraft, commitInvoiceDraft, releaseInvoiceDraft } from './invoicing.ts';
 import type { Lifecycles } from './journey.ts';
 
 export const DISPATCH_JOB = 'draft.dispatch';
@@ -101,7 +102,7 @@ export type Authority =
   | { readonly kind: 'approval'; readonly inputId: string; readonly approverId: string }
   | { readonly kind: 'grant'; readonly grantId: string };
 
-export type SendRefusal = 'not_pending' | 'tampered' | 'stale_facts' | 'grounding' | 'approval' | 'suppressed' | 'booking_lost' | 'booking_changed' | 'contact_rules';
+export type SendRefusal = 'not_pending' | 'tampered' | 'stale_facts' | 'grounding' | 'approval' | 'suppressed' | 'booking_lost' | 'booking_changed' | 'contact_rules' | 'invoice_changed';
 export type SendResult =
   | { readonly status: 'queued'; readonly outboxId: string }
   | { readonly status: 'refused'; readonly reason: SendRefusal; readonly failures?: readonly GroundingFailure[]; readonly rule?: PolicyRefusal };
@@ -116,6 +117,7 @@ export async function sendDraft(deps: SendDeps, tx: TenantTx, draftId: string, a
   const setStatus = async (status: DraftRow['status']) => {
     await tx.updateTable('drafts').set({ status }).where('id', '=', draftId).execute();
     await releaseForDraft(deps, tx, draftId);
+    await releaseInvoiceDraft(tx, draftId);
   };
 
   // Integrity: what is about to be sent is exactly what was approved (§7.1).
@@ -128,8 +130,8 @@ export async function sendDraft(deps: SendDeps, tx: TenantTx, draftId: string, a
   const snap = await snapshotAt(tx, deps.keyring, deps.clock.nowMs());
   const current = new Set([snap.business, snap.hours, ...snap.services, ...snap.prices, ...snap.areas, ...snap.policies, ...snap.faqs]
     .filter((x) => x !== undefined).map((x) => `${x.id}@${x.version}`));
-  // Booking facts are checked against the bookings themselves, below.
-  if (d.row.facts_used.filter((id) => !id.startsWith('booking:') && !id.startsWith('offer:')).some((id) => !current.has(id))) {
+  // Booking and invoice facts are checked against those records themselves, below.
+  if (d.row.facts_used.filter((id) => !id.startsWith('booking:') && !id.startsWith('offer:') && !id.startsWith('invoice:')).some((id) => !current.has(id))) {
     await setStatus('superseded');
     return { status: 'refused', reason: 'stale_facts' };
   }
@@ -145,6 +147,11 @@ export async function sendDraft(deps: SendDeps, tx: TenantTx, draftId: string, a
   if (booking) {
     await setStatus(booking === 'stale_facts' ? 'superseded' : 'blocked');
     return { status: 'refused', reason: booking };
+  }
+  const invoice = await checkInvoiceDraft(tx, d.row, d.body);
+  if (invoice) {
+    await setStatus('blocked');
+    return { status: 'refused', reason: invoice };
   }
   let approvalId: string | null = null;
   if (authority.kind === 'approval') {
@@ -172,6 +179,7 @@ export async function sendDraft(deps: SendDeps, tx: TenantTx, draftId: string, a
   await tx.updateTable('drafts').set({ status: 'approved', outbox_id: r.outboxId }).where('id', '=', draftId).execute();
   // The business has now committed: the offer counts as made, the held slot becomes a booking (§24).
   await commitBookingDraft(deps, tx, d.row, approvalId ? { kind: 'approval', approvalId } : { kind: 'grant', grantId: (authority as { grantId: string }).grantId });
+  await commitInvoiceDraft(deps, tx, d.row);
   await enqueue(tx, { kind: DISPATCH_JOB, dedupeKey: `dispatch:${draftId}`, ...(r.notBefore ? { runAt: r.notBefore } : {}), payload: { draft_id: draftId, outbox_id: r.outboxId, input_id: authority.kind === 'approval' && opts.receiptByDispatch !== false ? authority.inputId : null, grant_id: authority.kind === 'grant' ? authority.grantId : null } });
   await appendAudit(tx, { type: 'draft.authorised', actor: authority.kind === 'approval' ? { kind: 'user', ref: authority.approverId } : { kind: 'system', ref: `grant:${authority.grantId}` }, subject: `draft:${draftId}`, payload: { authority: authority.kind, outbox_ref: `outbox:${r.outboxId}` } });
   return { status: 'queued', outboxId: r.outboxId };
@@ -186,6 +194,7 @@ const REFUSAL_TEXT: Record<SendRefusal, string> = {
   suppressed: 'This customer has asked not to be contacted, so nothing was sent.',
   booking_lost: 'The time in this message is no longer held (it lapsed, or the booking changed), so nothing was sent. The customer has not been told anything.',
   booking_changed: 'A booking message must state the booked time exactly as it was held, so this version was not sent. Nothing was booked or changed.',
+  invoice_changed: 'An invoice message must state the invoice\'s exact total and payment link, so this version was not sent. No invoice was issued.',
   contact_rules: 'Not sent: the contact rules don\'t allow this message to this person (for example, no consent for it, or too many messages recently). Nothing was sent.',
 };
 export const refusalText = (r: SendRefusal) => REFUSAL_TEXT[r];

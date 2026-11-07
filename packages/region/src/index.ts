@@ -33,6 +33,9 @@ export const RegionConfigSchema = z.object({
     preference_registers: z.array(z.string()),
   }),
   retention_days: z.record(z.string(), z.number().int().positive()),
+  // §19.2: the tax rule comes from region config; each business's VAT status is its own confirmed record.
+  tax: z.object({ currency: z.string().length(3), vat_standard_rate_bp: z.number().int().min(0).max(10_000), payment_terms_days: z.number().int().min(0).max(120) })
+    .default({ currency: 'GBP', vat_standard_rate_bp: 2000, payment_terms_days: 14 }),
 }).superRefine((r, ctx) => {
   // D3 and §17.1: tier F is disabled in code; it can never be enabled by config.
   if (r.outbound_rules.tiers_enabled.includes('F')) ctx.addIssue({ code: 'custom', message: 'Tier F (purchased lists) is disabled in code (§17.1)' });
@@ -42,6 +45,9 @@ export const RegionConfigSchema = z.object({
   if (r.counsel_signoff && !r.signoff_expires_on) ctx.addIssue({ code: 'custom', message: 'A counsel sign-off needs an expiry date (§36.4)' });
 });
 export type RegionConfig = z.infer<typeof RegionConfigSchema>;
+
+/** The tax rules the cell's database must hold for this region (regions.tax_rules, §19.2). */
+export const taxRulesFromConfig = (cfg: RegionConfig) => ({ ...cfg.tax });
 
 /** The contact rules the cell's database must hold for this region (regions.contact_rules, §17.3). */
 export function contactRulesFromConfig(cfg: RegionConfig) {

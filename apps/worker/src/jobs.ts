@@ -29,6 +29,8 @@ import { EFFECT_JOB, TIMER_JOB } from '@sevari/lifecycle';
 import { releaseHold, RELEASE_HOLD_JOB } from './bookings.ts';
 import { journeyConsumers, runEffect, runTimer, type Lifecycles } from './journey.ts';
 import { onboardingConsumers, type CellLive } from '@sevari/onboarding';
+import type { PaymentProcessor } from '@sevari/finance';
+import { chaseInvoice, INVOICE_CHASE_JOB, INVOICE_PREPARE_JOB, invoicePrepareHandler, invoicingConsumers } from './invoicing.ts';
 import { respond } from './respond.ts';
 import type { JobHandler } from './runner.ts';
 import { clockTime, DISPATCH_JOB, OUTBOX_DISPATCH_JOB, RECONCILE_JOB } from './sending.ts';
@@ -47,6 +49,8 @@ export interface WorkerDeps {
   readonly lifecycles?: Lifecycles;
   /** Whether this cell may run live businesses (boot's cellLiveStatus). Without it, nobody can go live. */
   readonly cellLive?: CellLive;
+  /** The business's own payment processor (§19.1 Mode 1). Without one, invoices carry no payment link. */
+  readonly payments?: PaymentProcessor;
 }
 
 const RECONCILE_AFTER_MS = 60_000;
@@ -55,6 +59,7 @@ export function workerHandlers(deps: WorkerDeps): { handlers: Record<string, Job
   const lc = deps.lifecycles ? { lifecycles: deps.lifecycles } : {};
   const consumers = makeConsumers({ keyring: deps.keyring, clock: deps.clock, ...lc, ...(deps.publicBaseUrl ? { publicBaseUrl: deps.publicBaseUrl } : {}) });
   Object.assign(consumers, journeyConsumers({ keyring: deps.keyring, clock: deps.clock, ...lc }));
+  Object.assign(consumers, invoicingConsumers());
   Object.assign(consumers, onboardingConsumers({ keyring: deps.keyring, clock: deps.clock, ...(deps.cellLive ? { cellLive: deps.cellLive } : {}) }));
   const hitl = { keyring: deps.keyring, clock: deps.clock, consumers, ...lc };
 
@@ -95,6 +100,8 @@ export function workerHandlers(deps: WorkerDeps): { handlers: Record<string, Job
     [TIMER_JOB]: (tx, p) => runTimer(hitl, tx, String(p['timer_id'])),
     [EFFECT_JOB]: (tx, p) => runEffect(hitl, tx, p),
     [RELEASE_HOLD_JOB]: (tx, p) => releaseHold(deps, tx, String(p['booking_id'])),
+    [INVOICE_PREPARE_JOB]: invoicePrepareHandler({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers, ...(deps.payments ? { payments: deps.payments } : {}) }),
+    [INVOICE_CHASE_JOB]: (tx, p) => chaseInvoice({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers }, tx, p),
     [WEEKLY_REPORT_JOB]: async (tx, p) => {
       // Never report a week that hasn't finished, whatever the queue's timing says.
       if (deps.clock.nowMs() < Number(p['period_end'])) throw new Error('week not finished yet');
