@@ -12,10 +12,13 @@ import { appendAudit } from '@sevari/audit';
 import type { Clock } from '@sevari/clock';
 import type { TenantKeyring } from '@sevari/crypto';
 import { enqueue, withTenant, type Db, type TenantTx } from '@sevari/db';
-import { analyseEnquiry, classifyIntent as classifyByRules, ContractViolation, sensitiveFlags, type ModelIntent, type TenantScope, type VerticalPack, type KnowledgeSnapshot } from '@sevari/domain';
+import { analyseEnquiry, classifyIntent as classifyByRules, ContractViolation, sensitiveFlags, type BookingFact, type ModelIntent, type TenantScope, type VerticalPack, type KnowledgeSnapshot } from '@sevari/domain';
 import { snapshotAt } from '@sevari/knowledge';
 import { classifyIntent as classifyByModel, loadModelRegistry, selectModel, type LlmProvider, type ModelEntry, type ModelTrace } from '@sevari/llm';
+import { packOf } from '@sevari/onboarding';
 import { packFor } from '@sevari/verticals';
+import { busyTimes, upcomingBooking } from './bookings.ts';
+import { journeyEvent, type Lifecycles } from './journey.ts';
 
 export const CORE_VERSION = 'core-0.4.0';
 export const RESPOND_JOB = 'enquiry.respond';
@@ -23,6 +26,7 @@ export const RESPOND_JOB = 'enquiry.respond';
 export interface InboundDeps {
   readonly keyring: TenantKeyring;
   readonly clock: Clock;
+  readonly lifecycles?: Lifecycles;
 }
 
 export interface InboundOptions {
@@ -31,7 +35,7 @@ export interface InboundOptions {
 }
 
 interface InboundContext {
-  readonly msg: { id: string; conversation_id: string };
+  readonly msg: { id: string; conversation_id: string; contact_id: string };
   readonly text: string;
   readonly subject?: string;
   readonly fromName?: string;
@@ -40,6 +44,8 @@ interface InboundContext {
   readonly pack: VerticalPack;
   readonly timezone: string;
   readonly clarificationsSoFar: number;
+  readonly busy: readonly { startMs: number; endMs: number }[];
+  readonly booking?: BookingFact;
 }
 
 async function loadContext(deps: InboundDeps, tx: TenantTx, messageId: string): Promise<InboundContext> {
@@ -58,11 +64,16 @@ async function loadContext(deps: InboundDeps, tx: TenantTx, messageId: string): 
   const knowledge = await snapshotAt(tx, deps.keyring, nowMs);
   const vertical = knowledge.business?.body.vertical;
   if (!vertical) throw new ContractViolation('I5', 'tenant has no confirmed business record (vertical unknown)');
-  const pack = packFor(vertical);
+  // A business with its own drafted pack (§83.2) uses it once confirmed; otherwise its trade pack.
+  const pack = vertical === 'custom' ? await packOf(tx, knowledge) : packFor(vertical);
+  if (!pack) throw new ContractViolation('§83.2', 'this business has no confirmed pack yet');
   const timezone = knowledge.hours?.body.timezone ?? 'Europe/London';
   const clarificationsSoFar = (await tx.selectFrom('enquiries').select('id')
     .where('conversation_id', '=', msg.conversation_id).where('route', '=', 'clarify').execute()).length;
-  return { msg, text, ...(subject ? { subject } : {}), ...(fromName ? { fromName } : {}), nowMs, knowledge, pack, timezone, clarificationsSoFar };
+  // Availability avoids every held or booked slot; the customer's own next booking is a fact about them.
+  const busy = await busyTimes(tx, nowMs);
+  const booking = await upcomingBooking(tx, msg.contact_id, nowMs, timezone);
+  return { msg, text, ...(subject ? { subject } : {}), ...(fromName ? { fromName } : {}), nowMs, knowledge, pack, timezone, clarificationsSoFar, busy, ...(booking ? { booking } : {}) };
 }
 
 export async function processInbound(deps: InboundDeps, tx: TenantTx, messageId: string, opts: InboundOptions = {}): Promise<{ enquiryId: string; route: string; replayed: boolean }> {
@@ -73,7 +84,8 @@ export async function processInbound(deps: InboundDeps, tx: TenantTx, messageId:
   const { msg, pack } = c;
   const a = analyseEnquiry({
     text: c.text, ...(c.subject ? { subject: c.subject } : {}), ...(c.fromName ? { fromName: c.fromName } : {}), nowMs: c.nowMs, timezone: c.timezone,
-    pack, knowledge: c.knowledge, clarificationsSoFar: c.clarificationsSoFar, ...(opts.modelIntent ? { modelIntent: opts.modelIntent } : {}),
+    pack, knowledge: c.knowledge, clarificationsSoFar: c.clarificationsSoFar, busy: c.busy, ...(c.booking ? { booking: c.booking } : {}),
+    ...(opts.modelIntent ? { modelIntent: opts.modelIntent } : {}),
   });
   const enquiryId = randomUUID();
   await tx.insertInto('enquiries').values({
@@ -83,10 +95,15 @@ export async function processInbound(deps: InboundDeps, tx: TenantTx, messageId:
     intent_model_id: a.intent.model?.modelId ?? null, intent_prompt_id: a.intent.model?.promptId ?? null,
     route: a.route, services: [...a.services], flags: [...a.flags], urgency: a.slots.urgency, eligibility: a.eligibility.overall,
     facts_used: [...a.factsUsed], facts_missing: [...a.factsMissing],
-    analysis_enc: await deps.keyring.seal(tx, { table: 'enquiries', column: 'analysis_enc', rowId: enquiryId }, JSON.stringify(a)),
+    analysis_enc: await deps.keyring.seal(tx, { table: 'enquiries', column: 'analysis_enc', rowId: enquiryId, subject: msg.contact_id }, JSON.stringify(a)),
     analysed_at: deps.clock.now(),
   }).execute();
+  // Extra care, from the first message that shows it: nothing is ever sent to this person automatically (§22).
+  if (a.flags.includes('vulnerable_customer')) await tx.updateTable('contacts').set({ vulnerable_flag: true }).where('id', '=', msg.contact_id).execute();
   await enqueue(tx, { kind: RESPOND_JOB, dedupeKey: enquiryId, payload: { enquiry_id: enquiryId } });
+  // The person's journey (§16): first contact starts it; an opt-out or complaint moves it at once.
+  const event = a.route === 'opt_out' ? 'opted_out' : a.intent.intent === 'complaint' || a.flags.includes('complaint') ? 'complaint_opened' : 'enquiry_received';
+  await journeyEvent(deps, tx, msg.contact_id, { event, idempotencyKey: `enquiry:${enquiryId}`, actor: `customer:message:${msg.id}` });
   const t = opts.modelTrace;
   await appendAudit(tx, {
     type: 'enquiry.analysed', actor: { kind: 'system', ref: CORE_VERSION }, subject: `enquiry:${enquiryId}`,

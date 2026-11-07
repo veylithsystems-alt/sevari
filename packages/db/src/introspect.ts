@@ -7,6 +7,8 @@ export const GLOBAL_TABLES: Readonly<Record<string, string>> = {
   regions: 'cell configuration, no personal data',
   schema_migrations: 'migration ledger, no personal data',
   model_registry: 'cell model registry (§9), no personal data',
+  purpose_rules: 'purpose limitation per source tier (§17.2), no personal data',
+  plans: 'versioned plans and prices (§47), no personal data',
   platform_decisions: 'platform-scope decisions (§82); references and reason codes only',
   operators: 'platform operator credentials (§82 platform scope); cell-global, not tenant data',
 };
@@ -103,4 +105,14 @@ export function piiColumns(tables: readonly TableSecurity[]): Array<{ table: str
   return tables.flatMap((t) =>
     t.columns.filter((c) => c.comment?.startsWith('@pii')).map((c) => ({ table: t.table, column: c.name, comment: c.comment ?? '' })),
   );
+}
+
+/** Views that would run with their owner's rights (bypassing the caller's row-level security). Must be empty. */
+export async function insecureViews(db: Db): Promise<string[]> {
+  const { rows } = await sql<{ name: string }>`
+    SELECT c.relname AS name FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'public' AND c.relkind = 'v'
+       AND NOT coalesce(c.reloptions @> ARRAY['security_invoker=true'], false)
+     ORDER BY 1`.execute(db);
+  return rows.map((r) => r.name);
 }

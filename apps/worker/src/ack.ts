@@ -16,7 +16,7 @@ import { ground } from '@sevari/grounding';
 import { snapshotAt } from '@sevari/knowledge';
 import { dispatch, recordReply, reserve, suppress, updateReplyResult, type OutboundProvider } from '@sevari/outbound';
 import { render, type TemplateId } from '@sevari/templates';
-import { packFor } from '@sevari/verticals';
+import { packOf } from '@sevari/onboarding';
 
 export { ACK_JOB } from '@sevari/intake';
 
@@ -27,7 +27,7 @@ export interface AckDeps {
   readonly provider: OutboundProvider;
 }
 
-export type AckOutcome = 'sent' | 'suppressed' | 'opted_out' | 'blocked' | 'already' | 'no_channel' | 'failed' | 'ambiguous' | 'in_progress' | 'not_dispatchable' | 'already_sent';
+export type AckOutcome = 'deferred' | 'sent' | 'suppressed' | 'opted_out' | 'blocked' | 'already' | 'no_channel' | 'failed' | 'ambiguous' | 'in_progress' | 'not_dispatchable' | 'already_sent';
 
 /** Prepares the ACK inside the job's tenant transaction; dispatch happens after commit. */
 async function prepare(deps: AckDeps, tx: TenantTx, messageId: string): Promise<{ outboxId: string; replyId: string; receivedAt: number } | { outcome: AckOutcome }> {
@@ -64,7 +64,7 @@ async function prepare(deps: AckDeps, tx: TenantTx, messageId: string): Promise<
   const knowledge = await snapshotAt(tx, deps.keyring, deps.clock.nowMs());
   const business = knowledge.business;
   const templateId: TemplateId = flags.includes('risk_to_life') ? 'safety' : flags.some((f) => ALWAYS_HUMAN_FLAGS.has(f)) ? 'holding' : 'ack';
-  const pack = business ? packFor(business.body.vertical) : null;
+  const pack = business ? await packOf(tx, knowledge) : null;
   const rendered = business
     ? render(templateId, channel, {
       business: business.body.trading_name, replyTime: business.body.reply_time_statement, privacyUrl: business.body.privacy_notice_url,
@@ -95,10 +95,11 @@ async function prepare(deps: AckDeps, tx: TenantTx, messageId: string): Promise<
   });
   const replyId = await recordReply(tx, {
     inboundMessageId: m.id, outboxId: r.outboxId, purpose, channel, generator: 'template', templateId, factsUsed: g.draft.factsUsed, factsMissing: [],
-    groundingOk: true, autonomyDecision: 'auto_ack', sendResult: r.status === 'suppressed' ? 'suppressed' : 'reserved',
+    groundingOk: true, autonomyDecision: 'auto_ack', sendResult: r.status === 'suppressed' ? 'suppressed' : r.status === 'refused' ? `blocked_policy:${r.reason}` : 'reserved',
     latencyMs: { received_to_reserved: deps.clock.nowMs() - receivedAt },
   });
   if (r.status === 'suppressed') return { outcome: 'suppressed' };
+  if (r.status === 'refused') return { outcome: 'blocked' };
   return { outboxId: r.outboxId, replyId, receivedAt };
 }
 

@@ -59,6 +59,24 @@ export const PolicyRecord = z.object({
   text: z.string().min(1).max(2_000),
 });
 
+/**
+ * The business's resolution policy (§20.3): which remedies it offers for a complaint, and the limits. A
+ * remedy outside this is the owner's decision; the model never invents compensation.
+ */
+export const ResolutionPolicyRecord = z.object({
+  kind: z.literal('resolution_policy'),
+  /** Days to give a full response to a complaint, stated to the customer (the complaint clock). */
+  response_days: z.number().int().min(1).max(60),
+  remedies: z.array(z.object({
+    type: z.enum(['apology', 'redo', 'partial_credit', 'refund']),
+    /** Upper limit in minor units (credit or refund). Absent for apology and redo. */
+    max_minor: z.number().int().positive().optional(),
+    conditions: z.string().min(1).max(300),
+  })).min(1),
+}).superRefine((r, ctx) => {
+  for (const m of r.remedies) if ((m.type === 'partial_credit' || m.type === 'refund') && m.max_minor === undefined) ctx.addIssue({ code: 'custom', message: `${m.type} needs a max_minor limit` });
+});
+
 export const FaqRecord = z.object({
   kind: z.literal('faq'),
   question: z.string().min(1).max(300),
@@ -84,8 +102,9 @@ export type HoursRecord = z.infer<typeof HoursRecord>;
 export type AreaRecord = z.infer<typeof AreaRecord>;
 export type PolicyRecord = z.infer<typeof PolicyRecord>;
 export type FaqRecord = z.infer<typeof FaqRecord>;
+export type ResolutionPolicyRecord = z.infer<typeof ResolutionPolicyRecord>;
 export type BusinessRecord = z.infer<typeof BusinessRecord>;
-export type AnyKnowledge = ServiceRecord | PriceRecord | HoursRecord | AreaRecord | PolicyRecord | FaqRecord | BusinessRecord;
+export type AnyKnowledge = ServiceRecord | PriceRecord | HoursRecord | AreaRecord | PolicyRecord | FaqRecord | BusinessRecord | ResolutionPolicyRecord;
 
 /** Parse one record body by kind (ZodEffects can't sit inside a discriminated union). */
 export function parseKnowledge(body: unknown): AnyKnowledge {
@@ -97,6 +116,7 @@ export function parseKnowledge(body: unknown): AnyKnowledge {
     case 'area': return AreaRecord.parse(body);
     case 'policy': return PolicyRecord.parse(body);
     case 'faq': return FaqRecord.parse(body);
+    case 'resolution_policy': return ResolutionPolicyRecord.parse(body);
     case 'business': return BusinessRecord.parse(body);
     default: throw new Error(`unknown knowledge kind: ${String(kind)}`);
   }
@@ -118,14 +138,16 @@ export interface KnowledgeSnapshot {
   readonly areas: readonly KnowledgeFact<AreaRecord>[];
   readonly policies: readonly KnowledgeFact<PolicyRecord>[];
   readonly faqs: readonly KnowledgeFact<FaqRecord>[];
+  readonly resolution?: KnowledgeFact<ResolutionPolicyRecord>;
 }
 
 export function snapshotFrom(facts: readonly KnowledgeFact[]): KnowledgeSnapshot {
   const of = <K extends AnyKnowledge['kind']>(k: K) => facts.filter((f) => f.body.kind === k) as unknown as KnowledgeFact<Extract<AnyKnowledge, { kind: K }>>[];
   const business = of('business')[0];
   const hours = of('hours')[0];
+  const resolution = of('resolution_policy')[0];
   return {
-    ...(business ? { business } : {}), ...(hours ? { hours } : {}),
+    ...(business ? { business } : {}), ...(hours ? { hours } : {}), ...(resolution ? { resolution } : {}),
     services: of('service'), prices: of('price'), areas: of('area'), policies: of('policy'), faqs: of('faq'),
   };
 }

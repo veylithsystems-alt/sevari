@@ -13,12 +13,17 @@
 import { grantAutonomy } from '@sevari/autonomy';
 import { enqueue, type QuestionRow, type TenantTx } from '@sevari/db';
 import { ground } from '@sevari/grounding';
-import { ask, type Consumer, type ConsumerContext, type ConsumerRegistry, type ConsumerResult } from '@sevari/hitl';
+import { ask, notify, type Consumer, type ConsumerContext, type ConsumerRegistry, type ConsumerResult } from '@sevari/hitl';
 import { snapshotAt } from '@sevari/knowledge';
+import { assembleCopy, DOWNLOAD_TTL_MS, prepareDownload } from '@sevari/privacy';
 import { reserve } from '@sevari/outbound';
 import { render } from '@sevari/templates';
+import { releaseForDraft } from './bookings.ts';
+import { releaseInvoiceDraft } from './invoicing.ts';
 import { customerOf } from './respond.ts';
 import { createDraft, loadDraft, OUTBOX_DISPATCH_JOB, refusalText, sendDraft, type SendDeps } from './sending.ts';
+
+export const DSAR_ERASE_JOB = 'dsar.erase';
 
 const ref = (q: QuestionRow) => q.consumer_ref;
 const done = (effectKind: string, effectRef: string, outcomeText: string): ConsumerResult => ({ status: 'done', effectKind, effectRef, outcomeText });
@@ -41,6 +46,8 @@ export function makeConsumers(deps: SendDeps): ConsumerRegistry {
       if (ctx.response === 'approve') return sendWithApproval(ctx, draftId);
       if (ctx.response === 'reject') {
         await ctx.tx.updateTable('drafts').set({ status: 'rejected' }).where('id', '=', draftId).where('status', '=', 'pending_approval').execute();
+        await releaseForDraft(deps, ctx.tx, draftId);
+        await releaseInvoiceDraft(ctx.tx, draftId);
         return done('draft.rejected', `draft:${draftId}`, 'Done. Nothing was sent. The customer has their acknowledgement, and the enquiry stays open for you.');
       }
       // edit
@@ -61,6 +68,7 @@ export function makeConsumers(deps: SendDeps): ConsumerRegistry {
       // INV-16: the edit changed a fact. Ask, don't guess, whether it's a one-off or a records change (F25).
       const changes = g.failures.map((fl) => fl.detail);
       await ask(hitl, ctx.tx, {
+        subjectContactId: parent.row.contact_id,
         kind: 'clarify_edit', subjectRef: `draft:${child.id}`, actionClass: parent.row.action_class, contentDigest: child.digest, requiredRole: 'approver', assignTo: ctx.responderId,
         body: {
           title: 'Quick check on your edit', summary: 'Your edit says something that isn\'t in your confirmed records. Is it just for this customer, or should your records change too?',
@@ -76,6 +84,8 @@ export function makeConsumers(deps: SendDeps): ConsumerRegistry {
     },
     async onExpired(tx, q) {
       await tx.updateTable('drafts').set({ status: 'expired' }).where('id', '=', ref(q)).where('status', '=', 'pending_approval').execute();
+      await releaseForDraft(deps, tx, ref(q));
+      await releaseInvoiceDraft(tx, ref(q));
     },
   };
 
@@ -85,12 +95,15 @@ export function makeConsumers(deps: SendDeps): ConsumerRegistry {
       const draftId = ref(ctx.question);
       if (ctx.response === 'cancel') {
         await ctx.tx.updateTable('drafts').set({ status: 'rejected' }).where('id', '=', draftId).where('status', '=', 'pending_approval').execute();
+        await releaseForDraft(deps, ctx.tx, draftId);
+        await releaseInvoiceDraft(ctx.tx, draftId);
         return done('draft.rejected', `draft:${draftId}`, 'Done. Nothing was sent.');
       }
       const d = await loadDraft(deps, ctx.tx, draftId);
       if (!d) return failed('draft.send', `draft:${draftId}`, refusalText('not_pending'));
       if (ctx.response === 'update_records') {
         await ask(hitl, ctx.tx, {
+          subjectContactId: d.row.contact_id,
           kind: 'knowledge_update', subjectRef: `draft:${draftId}`, contentDigest: d.row.content_digest, requiredRole: 'owner',
           body: { title: 'Update your records', summary: 'You changed a fact in a reply. Open your records and confirm the new value so future replies use it.', preview: d.body, optionLabels: { done: 'I have updated them', not_now: 'Not now' }, safeDefaultText: 'Your records stay as they are until you confirm a change.' },
           options: ['done', 'not_now'], safeDefault: 'hold', consumer: { kind: 'knowledge.update', ref: draftId }, deadlineMs: 14 * 86_400_000,
@@ -101,6 +114,8 @@ export function makeConsumers(deps: SendDeps): ConsumerRegistry {
     },
     async onExpired(tx, q) {
       await tx.updateTable('drafts').set({ status: 'expired' }).where('id', '=', ref(q)).where('status', '=', 'pending_approval').execute();
+      await releaseForDraft(deps, tx, ref(q));
+      await releaseInvoiceDraft(tx, ref(q));
     },
   };
 
@@ -144,6 +159,67 @@ export function makeConsumers(deps: SendDeps): ConsumerRegistry {
     },
   };
 
+  registry['dsar.release'] = {
+    ack: (r) => ({
+      release: 'Understood. Preparing their copy and sending them a secure link.',
+      erase: 'Understood. Sending them a confirmation, then deleting their information.',
+      done: 'Recorded as dealt with.',
+      refuse: 'Recorded as refused.',
+    } as Record<string, string>)[r] ?? 'Recorded.',
+    async apply(ctx) {
+      const dsarId = ref(ctx.question);
+      const d = await ctx.tx.selectFrom('dsar_requests').selectAll().where('id', '=', dsarId).forUpdate().executeTakeFirst();
+      if (!d || d.status !== 'awaiting_release') return failed('dsar', `dsar:${dsarId}`, 'This request has already been dealt with.');
+      const setStatus = (status: 'releasing' | 'completed' | 'refused', outcome: string) =>
+        ctx.tx.updateTable('dsar_requests').set({ status, outcome, ...(status !== 'releasing' ? { completed_at: deps.clock.now() } : {}) }).where('id', '=', dsarId).execute();
+      if (ctx.response === 'refuse') {
+        await setStatus('refused', 'refused_by_owner');
+        return done('dsar.refused', `dsar:${dsarId}`, `Recorded as refused. You must tell them why, and that they can complain to the Information Commissioner's Office, by ${d.due_at.toISOString().slice(0, 10)}.`);
+      }
+      if (ctx.response === 'done') {
+        await setStatus('completed', 'handled_by_owner');
+        return done('dsar.completed', `dsar:${dsarId}`, 'Recorded as dealt with by you.');
+      }
+      if (!d.contact_id || !d.source_message_id) return failed('dsar', `dsar:${dsarId}`, 'This person\'s details are no longer held, so there is nothing more to do.');
+      const snap = await snapshotAt(ctx.tx, deps.keyring, deps.clock.nowMs());
+      const b = snap.business?.body;
+      if (!b) return failed('dsar', `dsar:${dsarId}`, 'Your business details are missing, so nothing was sent. Please complete them first.');
+      const c = await customerOf(deps, ctx.tx, d.source_message_id);
+      const base = (deps.publicBaseUrl ?? 'https://localhost.invalid').replace(/\/$/, '');
+      const values = { business: b.trading_name, replyTime: b.reply_time_statement, privacyUrl: b.privacy_notice_url, discloseAutomation: true };
+      const sendToThem = async (templateId: 'dsar_ready' | 'erasure_done', link: string | undefined, receiptByDispatch: boolean): Promise<{ outboxId: string } | { problem: string }> => {
+        if (!c.channel || !c.recipient) return { problem: 'there is no email or mobile number to send it to' };
+        const r = render(templateId, c.channel, { ...values, ...(link ? { link } : {}) });
+        if (!r.ok) return { problem: `the message could not be written (${r.reason})` };
+        // The link and its fixed lifetime are facts of this message (grounding checks every number, §68).
+        const fixed = link ? [link, `The link works once, for ${Math.round(DOWNLOAD_TTL_MS / 86_400_000)} days.`] : [];
+        const draft = await createDraft(deps, ctx.tx, {
+          enquiryId: null, conversationId: c.conversationId, contactId: c.contactId, inReplyTo: c.messageId, channel: c.channel, recipient: c.recipient,
+          purpose: 'reply', actionClass: 'info_reply', body: r.text, sources: { factTexts: [b.trading_name, b.privacy_notice_url, ...fixed], factIds: [], customerText: '' },
+          generator: 'template', templateId, factsUsed: [],
+        });
+        const sent = await sendDraft(deps, ctx.tx, draft.id, { kind: 'approval', inputId: ctx.inputId, approverId: ctx.responderId }, undefined, { receiptByDispatch });
+        return sent.status === 'queued' ? { outboxId: sent.outboxId } : { problem: refusalText(sent.reason).replace(/\.$/, '').toLowerCase() };
+      };
+      if (ctx.response === 'release') {
+        const copy = await assembleCopy(deps, ctx.tx, d.contact_id, b.trading_name, b.privacy_notice_url);
+        const token = await prepareDownload(deps, ctx.tx, dsarId, d.contact_id, copy);
+        const sent = await sendToThem('dsar_ready', `${base}/v1/dsar/${token}`, true);
+        await setStatus('completed', 'outboxId' in sent ? 'copy_sent' : 'copy_ready_not_sent');
+        return 'outboxId' in sent ? { status: 'pending' } : failed('dsar.copy', `dsar:${dsarId}`, `Their copy is ready, but the link was not sent: ${sent.problem}. Please contact them directly.`);
+      }
+      // erase: confirm to them first, then erase once that message has gone (or failed for good).
+      const sent = await sendToThem('erasure_done', undefined, false);
+      await setStatus('releasing', 'erasing');
+      await enqueue(ctx.tx, { kind: DSAR_ERASE_JOB, dedupeKey: `erase:${dsarId}`, payload: { dsar_id: dsarId, contact_id: d.contact_id, input_id: ctx.inputId, outbox_id: 'outboxId' in sent ? sent.outboxId : null } });
+      return { status: 'pending' };
+    },
+    async onReplyDue(tx, q) {
+      const owner = await tx.selectFrom('users').select('id').where('role', '=', 'owner').where('status', '=', 'active').executeTakeFirst();
+      if (owner) await notify(tx, deps.keyring, { userId: owner.id, kind: 'alert', ref: `question:${q.id}`, dedupeKey: `dsar_due_soon:${q.id}`, text: 'A customer\'s personal-information request is due in 7 days. Please decide what to do.' });
+    },
+  };
+
   return registry;
 }
 
@@ -168,6 +244,6 @@ export async function holdingUpdate(deps: SendDeps, tx: TenantTx, draftId: strin
     draft: g.draft, conversationId: d.row.conversation_id, contactId: d.row.contact_id, ...(d.row.in_reply_to ? { inReplyTo: d.row.in_reply_to } : {}),
     channel: d.row.channel, recipient: d.recipient, actionClass: 'ack', dedupeKey: key, templateId: 'holding_update', templateVersion: r.version,
   });
-  if (res.status === 'reserved' && res.created) await enqueue(tx, { kind: OUTBOX_DISPATCH_JOB, dedupeKey: `dispatch:${res.outboxId}`, payload: { outbox_id: res.outboxId } });
+  if (res.status === 'reserved' && res.created) await enqueue(tx, { kind: OUTBOX_DISPATCH_JOB, dedupeKey: `dispatch:${res.outboxId}`, ...(res.notBefore ? { runAt: res.notBefore } : {}), payload: { outbox_id: res.outboxId } });
   return res.status === 'reserved' && res.created ? 'sent' : 'skipped';
 }

@@ -6,7 +6,9 @@ import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import type { ChannelId } from '@sevari/channels';
 import { findEndpoint } from '@sevari/db';
 import { receiveInbound, type IntakeDeps } from '@sevari/intake';
+import { registerOnboardingRoutes } from './onboarding.ts';
 import { registerOwnerRoutes, type OwnerDeps } from './owner.ts';
+import type { CellLive } from '@sevari/onboarding';
 import type { RateLimiter } from './rate-limit.ts';
 
 export interface ServerDeps {
@@ -17,7 +19,7 @@ export interface ServerDeps {
   readonly ready: () => Promise<boolean>;
   readonly logger?: boolean;
   /** Owner app API (Phase 6/18). Omitted on intake-only nodes. */
-  readonly owner?: OwnerDeps;
+  readonly owner?: OwnerDeps & { readonly cellLive?: CellLive };
 }
 
 const CHANNELS: ReadonlySet<string> = new Set(['webform', 'email', 'sms', 'api']);
@@ -87,6 +89,9 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     }
   });
 
-  if (deps.owner) registerOwnerRoutes(app, deps.owner);
+  if (deps.owner) {
+    registerOwnerRoutes(app, deps.owner);
+    registerOnboardingRoutes(app, deps.owner);
+  }
   return app;
 }

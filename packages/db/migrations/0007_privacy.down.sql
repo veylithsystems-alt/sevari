@@ -1,0 +1,14 @@
+DROP TABLE IF EXISTS retention_runs;
+DROP TABLE IF EXISTS erasure_log;
+DROP TABLE IF EXISTS consents;
+DROP TABLE IF EXISTS dsar_requests;
+ALTER TABLE human_questions DROP CONSTRAINT IF EXISTS human_questions_kind_check;
+ALTER TABLE human_questions ADD CONSTRAINT human_questions_kind_check CHECK (kind IN ('approve_draft', 'clarify_edit', 'owner_task', 'autonomy_grant', 'knowledge_update'));
+REVOKE DELETE ON human_notifications FROM sevari_app;
+REVOKE UPDATE (response_digest) ON human_inputs FROM sevari_app;
+REVOKE UPDATE (content_digest) ON human_questions FROM sevari_app;
+ALTER TABLE human_notifications DROP CONSTRAINT IF EXISTS human_notifications_subject_fk, DROP COLUMN IF EXISTS subject_contact_id;
+ALTER TABLE human_questions DROP CONSTRAINT IF EXISTS human_questions_subject_fk, DROP COLUMN IF EXISTS subject_contact_id;
+REVOKE UPDATE (kek_id) ON tenant_keys FROM sevari_app;
+DROP TABLE IF EXISTS subject_keys;
+DROP FUNCTION IF EXISTS sevari_meta.subject_keys_no_unshred();

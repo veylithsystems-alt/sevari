@@ -14,7 +14,9 @@ export interface OutboundEnvelope {
 
 export type SendOutcome =
   | { readonly status: 'accepted'; readonly providerMessageId: string }
-  | { readonly status: 'rejected'; readonly reason: string; readonly suppress: boolean };
+  | { readonly status: 'rejected'; readonly reason: string; readonly suppress: boolean }
+  /** Definitely not accepted and safe to try again later (e.g. a rate or daily limit). */
+  | { readonly status: 'deferred'; readonly reason: string };
 
 export interface OutboundProvider {
   readonly name: string;

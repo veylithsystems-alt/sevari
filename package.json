@@ -44,6 +44,10 @@
     "@sevari/intake": "workspace:*",
     "@sevari/knowledge": "workspace:*",
     "@sevari/llm": "workspace:*",
+    "@sevari/lifecycle": "workspace:*",
+    "@sevari/metrics": "workspace:*",
+    "@sevari/finance": "workspace:*",
+    "@sevari/onboarding": "workspace:*",
     "@sevari/outbound": "workspace:*",
     "@sevari/privacy": "workspace:*",
     "@sevari/region": "workspace:*",
@@ -62,6 +66,7 @@
     "typescript": "5.9.3",
     "typescript-eslint": "8.46.4",
     "vitest": "3.2.7",
+    "zod": "3.25.76",
     "yaml": "2.8.1"
   },
   "pnpm": {

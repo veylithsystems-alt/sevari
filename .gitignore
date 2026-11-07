@@ -9,5 +9,5 @@ coverage/
 .local/
 eval/reports/*.tmp.md
 .stryker-tmp/
-reports/
+/reports/
 eval/reports/ci.md

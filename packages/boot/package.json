@@ -13,6 +13,7 @@
     "@sevari/domain": "workspace:*",
     "@sevari/egress": "workspace:*",
     "@sevari/identity": "workspace:*",
+    "@sevari/lifecycle": "workspace:*",
     "@sevari/privacy": "workspace:*",
     "@sevari/region": "workspace:*"
   }

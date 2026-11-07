@@ -128,7 +128,7 @@ describe('[Phase 4] outbox safety (§5.2, Part J §66 groundwork for F46–F50)'
     t = await newTenant(h, 'uk', 'Outbox Ltd');
     await withTenant(h.db, t, (tx) => keyring.provision(tx));
     ({ contactId, conversationId } = await withTenant(h.db, t, async (tx) => {
-      const c = await tx.insertInto('contacts').values({ tenant_id: t.tenantId, region: t.region, source: 'test', lawful_basis: 'test', captured_at: clock.now(), captured_by: 'test' }).returning('id').executeTakeFirstOrThrow();
+      const c = await tx.insertInto('contacts').values({ tenant_id: t.tenantId, region: t.region, source: 'channel:email', lawful_basis: 'legitimate_interests_enquiry_response', captured_at: clock.now(), captured_by: 'test' }).returning('id').executeTakeFirstOrThrow();
       const v = await tx.insertInto('conversations').values({ tenant_id: t.tenantId, region: t.region, contact_id: c.id }).returning('id').executeTakeFirstOrThrow();
       return { contactId: c.id, conversationId: v.id };
     }));

@@ -1,0 +1,111 @@
+# Lifecycle V (§16): Veylith and the businesses that use Sevari. It runs on the house tenant (Veylith's
+# own account in the cell) on exactly the same engine as every customer journey: dogfooded.
+id: business_journey
+version: 2
+lifecycle: V
+subject_type: business
+description: A business from first contact with Veylith, through contract and onboarding, to renewal or exit.
+initial: prospect
+
+states:
+  prospect:    { stage: 1, label: New contact }
+  qualifying:  { stage: 2, label: "Interested, being qualified" }
+  proposed:    { stage: 3, label: Proposal sent, timers: [{ event: proposal_follow_up, after_minutes: 10080 }] }
+  contracted:  { stage: 4, label: Contract signed }
+  onboarding:  { stage: 5, label: Setting up }
+  live:        { stage: 6, label: Live, timers: [{ event: renewal_due, after_minutes: 482400 }] }
+  in_dispute:  { stage: 10, label: Complaint open }
+  resolved:    { stage: 10, label: Complaint resolved }
+  renewing:    { stage: 11, label: Renewal due }
+  offboarding: { stage: 12, label: Leaving }
+  lost:        { stage: 12, label: Did not go ahead }
+  exited:      { stage: 12, label: Left, terminal: true }
+  opted_out:   { stage: 12, label: Asked not to be contacted, terminal: true }
+
+stages:
+  "7":  { automatic: "Support questions are answered from Veylith's records at any point; anything else goes to a person." }
+  "8":  { human: "Subscription invoices: by hand until subscription billing (Phase 13)." }
+  "9":  { human: "Matching subscription payments: by hand until Phase 13." }
+
+transitions:
+  - from: [prospect, lost, resolved]
+    event: enquiry_received
+    to: qualifying
+    effects:
+      - ask_owner:
+          title: A business is interested in Sevari
+          summary: Their message is in your inbox. When you have sent them a proposal, or decided it isn't a fit, tell Sevari.
+          options:
+            - { event: proposal_sent, label: "I've sent a proposal" }
+            - { event: not_a_fit, label: Not a fit }
+          deadline_hours: 336
+          safe_default_text: Nothing is sent to them until you decide.
+  - { from: [qualifying], event: proposal_sent, to: proposed }
+  - { from: [qualifying], event: not_a_fit, to: lost }
+  - from: [proposed]
+    event: proposal_follow_up
+    to: proposed
+    effects:
+      - ask_owner:
+          title: Has the business signed?
+          summary: A week has passed since the proposal. Signing the contract is always your decision; Sevari only records it.
+          options:
+            - { event: contract_signed, label: "Yes, the contract is signed" }
+            - { event: declined, label: They declined }
+          deadline_hours: 168
+          safe_default_text: Nothing changes until you answer; Sevari will ask again in a week.
+  - from: [proposed]
+    event: contract_signed
+    to: contracted
+    human: true
+    effects:
+      - ask_owner:
+          title: Start setting them up?
+          summary: The contract is recorded. Tell Sevari when onboarding has started.
+          options:
+            - { event: onboarding_started, label: Onboarding has started }
+          deadline_hours: 336
+          safe_default_text: Nothing starts until you say so.
+  - { from: [proposed], event: declined, to: lost }
+  - from: [contracted]
+    event: onboarding_started
+    to: onboarding
+    effects:
+      - ask_owner:
+          title: Tell Sevari when they go live
+          summary: Going live is a human decision (the business's own go-live tap, or yours for regulated trades).
+          options:
+            - { event: go_live, label: They are live }
+          deadline_hours: 720
+          safe_default_text: They stay in set-up until someone confirms.
+  - { from: [onboarding], event: go_live, to: live, human: true }
+  - from: [live]
+    event: renewal_due
+    to: renewing
+    effects:
+      - ask_owner:
+          title: A renewal is coming up
+          summary: Their year is nearly up. Tell Sevari when they renew, or if they are leaving.
+          options:
+            - { event: renewed, label: They renewed }
+            - { event: offboard_requested, label: They are leaving }
+          deadline_hours: 720
+          safe_default_text: Nothing changes until you answer.
+  - { from: [renewing], event: renewed, to: live, human: true }
+  - from: [live, renewing]
+    event: offboard_requested
+    to: offboarding
+    human: true
+    effects:
+      - ask_owner:
+          title: Offboarding
+          summary: Give them their data export, close their account, then tell Sevari. Final erasure is always a human decision.
+          options:
+            - { event: exited, label: They have left }
+          deadline_hours: 720
+          safe_default_text: Their account stays as it is until you confirm.
+  - { from: [offboarding], event: exited, to: exited, human: true }
+  # The complaint itself is a case with its own clock and owner (§20); the journey just marks it open.
+  - { from: "*", event: complaint_opened, to: in_dispute }
+  - { from: [in_dispute], event: complaint_resolved, to: resolved }
+  - { from: "*", event: opted_out, to: opted_out }

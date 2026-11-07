@@ -4,6 +4,7 @@
  * so the model can never be given a fact that grounding would not accept, or the reverse.
  */
 import type { EnquiryAnalysis } from './analyse.ts';
+import { slotPhrase } from './bookings.ts';
 import type { KnowledgeSnapshot } from './knowledge.ts';
 
 export interface FactsBundle {
@@ -50,6 +51,10 @@ export function factsBundle(a: EnquiryAnalysis, k: KnowledgeSnapshot): FactsBund
     facts['available_windows'] = ws;
     texts.push(`Available: ${ws.join(', ')}.`);
   }
+  if (a.booking) {
+    facts['current_booking'] = slotPhrase(a.booking);
+    texts.push(`Your booking is for ${slotPhrase(a.booking)}.`);
+  }
   const faqs = k.faqs.filter((f) => a.faqs.includes(`${f.id}@${f.version}`));
   if (faqs.length) {
     facts['answers'] = faqs.map((f) => ({ question: f.body.question, answer: f.body.answer }));
@@ -70,6 +75,14 @@ export function replySections(a: EnquiryAnalysis, k: KnowledgeSnapshot): string[
   const name = (code: string) => k.services.find((s) => s.body.code === code)?.body.name ?? code.replace(/_/g, ' ');
   const service = a.services[0];
   if (a.intent.intent === 'thanks') return ['Thank you for your message.'];
+  if (a.booking && a.intent.intent !== 'cancel') {
+    out.push(`Your booking is for ${slotPhrase(a.booking)}.`);
+    if (a.intent.intent === 'follow_up') {
+      const phone = k.business?.body.phone;
+      out.push(`If anything has changed, just reply to this message${phone ? ` or call us on ${phone}` : ''}.`);
+      return out;
+    }
+  }
   if (a.price?.kind === 'known') {
     const what = name(a.price.serviceCode);
     out.push(`${capitalise(what)}: ${a.price.statement}.`);
@@ -84,7 +97,10 @@ export function replySections(a: EnquiryAnalysis, k: KnowledgeSnapshot): string[
   for (const f of k.faqs.filter((f) => a.faqs.includes(`${f.id}@${f.version}`))) out.push(f.body.answer);
   if (!out.length && service) out.push(`Yes, we can help with ${name(service)}.`);
   const phone = k.business?.body.phone;
-  out.push(`If you would like to go ahead, just reply to this message${phone ? ` or call us on ${phone}` : ''}.`);
+  out.push(a.booking && a.windows?.length
+    ? `If one of these suits you better, just reply with the day and time${phone ? ` or call us on ${phone}` : ''}.`
+    : a.windows?.length ? `To book one of these, just reply with the day and time${phone ? ` or call us on ${phone}` : ''}.`
+      : `If you would like to go ahead, just reply to this message${phone ? ` or call us on ${phone}` : ''}.`);
   return out;
 }
 

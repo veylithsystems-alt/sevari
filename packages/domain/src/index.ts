@@ -16,3 +16,4 @@ export * from './pricing.ts';
 export * from './availability.ts';
 export * from './analyse.ts';
 export * from './facts.ts';
+export * from './bookings.ts';

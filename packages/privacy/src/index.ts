@@ -1,1 +1,7 @@
 export * from './registry.ts';
+export * from './erasure.ts';
+export * from './consent.ts';
+export * from './dsar.ts';
+export * from './retention.ts';
+export * from './shred-register.ts';
+export * from './keys.ts';

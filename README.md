@@ -8,7 +8,7 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 
 ## For Dan: where things stand (plain English)
 
-**Last updated:** 14 October 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.13
+**Last updated:** 7 November 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.13
 
 **Status: build in progress.** Under contract Part J there are three separate milestones: *build-complete* (code and tests done), *production-approved* (deployment, recovery, security, support, legal documents all proven: [`docs/readiness/`](docs/readiness/README.md)), and *commercially launched* (pilots prove the product is worth paying for: the Value Gate). Passing automated tests is **not** evidence that Sevari is ready for paying customers.
 
@@ -21,9 +21,16 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 | 4 | The instant acknowledgement, and the fact-checker that stops made-up prices or dates | ✅ Done |
 | 5 | The local AI models and how they're scored | ✅ Code done · **your step:** run the model benchmark on the VPS ([how](docs/ops/model-benchmark.md)) |
 | 18 → 6 | Your approvals: questions to you, one-tap approve, nothing sends without it, your inbox app | ✅ Done |
-| 7 | Privacy: erasure, data requests, retention, the consent record | Next |
-| 8 | Measurements and weekly reports | Planned |
-| 9+ | Lifecycle, missed-call texts, finance, complaints, offboarding, learning, hardening | Planned |
+| 7 | Privacy: erasure, data requests, retention, the consent record, key management | ✅ Done |
+| 8 | Measurements and weekly reports | ✅ Done · service levels approved 21 Oct · **your step on the server:** record it with `scripts/approve-slo.ts` |
+| 9 | Bookings and the customer journey | ✅ Done |
+| 10 | Consent and contact rules (who may be messaged, and how) | ✅ Done |
+| 11 | Onboarding: a business sets itself up and taps "go live" | ✅ Done (screens in the owner app come next) |
+| 12 | Invoices, payment links and chasing | ✅ Done (real payment provider awaits your choice, Q-24) |
+| 13 | Billing for Sevari itself (subscriptions), and accounting software sync | ✅ Done (prices await your answer to Q-2; accounting platforms each need your approval) |
+| 14 | Complaints and disputes | ✅ Done |
+| 15 | Leaving Sevari, data export, handing cases to others, customer portal | Next |
+| 16+ | Missed-call texts, finance, complaints, offboarding, learning, hardening | Planned |
 | K1–K6 | **Agent Mode**: the seven agents (BASTION, SENTINEL, LEDGER, VANGUARD, HERALD, COMPASS, FORGE) as plug-in packs | Planned (after approvals are built) |
 
 **What's proven so far (each one is an automatic test that runs on every change):**
@@ -60,7 +67,74 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
   - Refunds, payment requests and cancellations can never be automatic: the database itself refuses.
 - **Sending survives crashes.** Tests kill the worker halfway through sending, lose the provider's reply, and send duplicate webhooks. Every time, the customer gets exactly one message, or you are told it needs checking. Sevari never guesses and never re-sends blindly.
 - **Your inbox app** works on a phone (tested in a real browser at phone size), loads nothing from other websites, and shows what's waiting and what happened.
-- Sevari can't connect to any outside service unless you've approved that supplier. This is enforced three ways: in the code, by a gatekeeper process, and by the server's firewall (proven by a test). The supplier list (processor register) is generated automatically and currently says: no suppliers approved yet.
+- **Deleting a person really deletes them.**
+  - Every customer has their own encryption key. When a customer asks to be forgotten and you approve it, Sevari sends them a confirmation, destroys their key, and deletes their records.
+  - A test then searches every table in the database for any trace of them, and finds none. Copies made earlier (like backups) can no longer be read either.
+  - If a backup from before the deletion is ever restored, a separate record outside the database destroys their key again before anything can use it.
+  - Only the things the law needs are kept, all unreadable: the "never contact again" note, proof the request was handled, and who approved what.
+- **Data requests are handled for you, on the legal clock.**
+  - When someone asks for a copy of their data, or to be deleted, Sevari recognises it, sets the one-month deadline, reminds you a week before, and waits for your decision.
+  - Release a copy, and the person gets a secure link that works once, for 7 days, containing only their data.
+  - Refuse, and you're told exactly what you still owe them.
+- **Consent is a permanent record.** Every "yes" and "no thanks" is recorded with the exact wording the person saw. The latest answer always wins, and nobody can edit or delete the history.
+- **Keeping data only as long as allowed:** Sevari reports what is past its keep-by date, but deletes nothing until a lawyer confirms the periods. Deleting too early can break other legal duties.
+- **Encryption keys can be rotated, revoked and recovered**, including a full drill for a suspected key leak. Tested end to end.
+- **Every week you get a plain-English report**, built only from the numbers: how many enquiries came in, how fast each was acknowledged, how many replies went out, what you approved, changed or stopped, how long your decisions took, and the questions customers asked that your records couldn't answer yet (your to-do list). It's sent once per week, never twice.
+- **Two numbers must always be zero, and are checked every week:** messages sent without your approval or an earned permission, and messages sent to someone who asked to stop. A test forges a bad send to prove the check catches it. The measurements obey the same walls as everything else: one business can never measure another.
+- **Service levels need your approval.** The app won't let real businesses go live until you've approved the service levels (uptime, recovery time, backups: see Q-20) *and* a lawyer has signed off, each with a record in the system. Writing numbers into a settings file without the record stops the app from starting.
+- **First baseline report:** 100 test enquiries across the five trades, all acknowledged except the 5 who asked to stop (who were never messaged again), with both must-be-zero numbers at zero: [`docs/reports/baseline-v1.md`](docs/reports/baseline-v1.md).
+- **Every customer has a journey, and so does every business you sign up.**
+  - The steps (new, enquiring, offered, booked, job done, past customer, cancelled, opted out...) are written in plain settings files, not code, and the app checks them when it starts: every step reachable, no step ambiguous, all 12 stages of the contract covered.
+  - Each move is recorded once, even if the same message arrives twice, and two things happening at the same moment can't both win.
+  - A step that books, sends or moves money still needs your approval or an earned permission. A step only a person may take (like signing a contract) needs a person's recorded answer. A timer can only remind; it can never approve anything.
+  - Veylith's own sales journey (interested → proposal → contract → set-up → live → renewal) runs on the same engine, in Veylith's own account. Sevari asks you at each step, and you tap the answer.
+- **Real bookings, with no double-booking.**
+  - When a customer asks for a visit, the reply offers times from your opening hours that aren't already taken.
+  - When they reply ("the first one", "Thursday at 10"), Sevari holds that time for them and writes the confirmation for you to approve. If their reply could mean two times, it asks which one. It never guesses.
+  - The booking becomes real only when you approve the confirmation. If you say no, or don't answer in time, the time is freed and the customer can still pick from what they were offered.
+  - The database itself refuses two bookings at overlapping times. Tested with customers grabbing the same slot at the same moment: one gets it.
+  - A confirmation must state exactly the time that was held, so an edit can't quietly book a different time.
+  - "Any update?" is answered from the booking itself. A cancellation always needs your tap, and approving it frees the time.
+  - An hour after the job, Sevari asks you "Did it go ahead?", and your answer updates the customer's record.
+- **Every message passes the contact rules first**, in the same instant as the "asked to stop" check, so nothing can slip between the two:
+  - **Where they came from:** someone with no recorded source, or from a source that isn't switched on, can't be messaged. The database itself refuses it, even if the code had a bug.
+  - **What they agreed to:** an enquiry is an invitation to answer it, not to send marketing. Marketing needs a recorded "yes" for that purpose and channel, and the latest answer always wins.
+  - **Who they are:** sole traders, partnerships and anyone unknown are treated as individuals, so cold business-to-business outreach can never reach them. That outreach is switched off in the UK anyway until a lawyer signs off. Bought lists can't exist in the system at all.
+  - **Do-not-call registers:** a marketing text needs a clear check against the register. No register connected, or a listed number, means no.
+  - **When and how often:** messages Sevari starts itself wait until 07:30 if it's night, and are capped at 3 a week per person (marketing at 4 a month). Answers to people who wrote in go straight away, and an acknowledgement or safety message is never delayed.
+  - **Opt-outs win races:** tested 25 times with an opt-out and a send at the same moment. Nothing went out after the opt-out landed.
+  - These rules are settings in the UK rule pack, not code. The app refuses to start if its database copy of the rules doesn't match the rule pack.
+- **Any service business can set itself up, with no setup call.**
+  - The owner answers the onboarding questions: their services in their own words, prices or "price on inspection", hours, the postcodes they cover, policies. Sevari turns the answers into records the owner checks and confirms.
+  - Window cleaners, dog groomers, anything: Sevari drafts a "pack" (the services and the words customers use for them) and tests it against practice enquiries before it can be used. Building this found and fixed a real gap: "please delete the personal data you hold about me" wasn't being recognised as a data request.
+  - **An automatic go-live checklist** says exactly what's still missing. A channel counts as working only after a test message with a one-time code comes through it.
+  - **Going live is the owner's own tap**, recorded as a decision. The database itself refuses any other way to switch a business on. The owner can choose practice mode first: Sevari drafts replies but sends nothing, and only the owner can end it.
+  - **Regulated work** (gas, electrical, childcare, health, legal, finance and others) is spotted in the owner's own words and needs your approval too. The owner can't remove the flag.
+  - A business that isn't live sends nothing to customers.
+  - **Importing old customer lists** needs a recorded lawful basis and where the data came from; without it nothing is imported. Imported people can only be messaged with their consent.
+- **Invoices and money, without ever holding money.**
+  - When the owner confirms a job is done, Sevari drafts the invoice from their confirmed price (or asks the amount if the price wasn't fixed), with a payment link from the business's own payment account, and asks the owner to approve it. The invoice only gets its number, and only counts, once approved.
+  - VAT follows the owner's own VAT status; the AI never works out money.
+  - **Every penny goes through a double-entry ledger** that always balances. The database refuses anything unbalanced and nothing in it can be changed or deleted. Corrections are new entries.
+  - **Payments are recorded once**, however many times the payment provider reports them.
+  - **Payments are matched to invoices automatically only when certain** (the invoice number is on the payment, or an exact amount from the right person). Anything less certain is suggested to the owner, never applied.
+  - Reminders after the due date are drafted for the owner to approve. No interest or charges are ever added unless the owner's records say so.
+  - **Sevari never holds, pools or moves customers' money.** The "platform" money mode is built but locked: only Veylith can switch it on, and only with a lawyer's sign-off.
+- **Billing businesses for Sevari, fairly and automatically.**
+  - Prices are data you approve, never code. A price you haven't approved is never charged, even if it's newer.
+  - Each month, Sevari counts what a business used (replies sent, team members, channels), never what anyone wrote, and prepares the invoice for your approval.
+  - Free pilot periods and founding-rate locks are honoured automatically: a business on the £59 founding rate keeps it even if the list price rises. A part month is charged for the days used.
+  - Each period is billed exactly once.
+  - **If a business doesn't pay**, reminders go out with your approval and you're told when they're 14 days overdue. **Sevari never suspends anyone by itself:** suspension needs your recorded decision after a notice period, and the database refuses it otherwise.
+- **Accounting software sync** (Xero, QuickBooks, FreeAgent once each is approved): every invoice and payment is pushed to the business's books exactly once. A failed push becomes a task for the owner, and disconnecting destroys the access key for good.
+- **Complaints are handled properly, not lost.**
+  - Every complaint opens a case with a named owner and a clock (your resolution policy's response time, or 7 days). If it isn't resolved in time, you get an alert.
+  - **Legal threats, regulators, safeguarding, discrimination, injury, the press and vulnerable customers** go straight to you. The customer gets only a polite holding reply.
+  - For everyday complaints, you pick a remedy from your own written resolution policy (an apology, a redo, or a refund or credit up to your limit). Sevari drafts the exact message for you to approve. Anything over your limit is refused; to offer more, you write it yourself. The AI can never offer compensation by itself.
+  - Closing a case records the main cause, so patterns show up.
+  - **Customers who may need extra care** are never sent anything automatically, even where you've let Sevari send by itself.
+  - **For a payment dispute or chargeback**, Sevari assembles the evidence (invoice, payments, ledger, history, conversation) for you to check and submit.
+- Sevari can't connect to any outside service unless you've approved that supplier. This is enforced three ways: in the code, by a gatekeeper process, and by the server's firewall (proven by a test). The supplier list (processor register) is generated automatically and currently lists one approved supplier: Brevo, for email.
 
 **Your decisions of 14 October (contract v1.12, Part L):**
 - New businesses can go live within the hour: they answer the questions, an automatic checklist runs, and their own "go live" tap starts Sevari in "ask me first" mode. You only approve regulated trades.
@@ -74,6 +148,10 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 - **Self-improving knowledge**: questions Sevari can't answer become one question to the owner, old prices get re-checked, and disagreements with other systems become a proposal, never a silent change.
 - **Growth**: the free "How fast do you reply?" check, and referral rewards paid only after the new customer has paid twice.
 - How your original vision lines up with the contract: [`docs/reference/original-vision.md`](docs/reference/original-vision.md) §7.
+
+**Your decisions of 21 October:**
+- **Service levels: the recommended set.** Up 99.5% of the time, back within 4 hours, at most 24 hours of data lost, daily backups, a monthly restore drill. When the server is set up, you run one command with your founder login. It records your approval and fills in the settings together, so neither can exist without the other.
+- **Email: Brevo, approved 28 October.** Free for 300 emails a day, with the data held in France. The connection is built and tested. Only Brevo's sending address is unlocked; nothing else of theirs is reachable. Your steps before the first real email: create the Brevo account, switch off its AI, SMS and marketing features, verify the sending domain, and put the key in the server's secrets store ([checklist](docs/adr/providers/email-brevo.md)). A lost reply from Brevo is never re-sent blindly: a person checks, so customers never get duplicates. Addresses Brevo reports as blocked are never emailed again.
 
 **Things I found that you should know:**
 - Your old n8n build (v3.6 / v4.1) has 16 bugs I've written up in [`docs/reference/v4.1-behaviours.md`](docs/reference/v4.1-behaviours.md). The serious ones: the "tamper-proof" record could be changed without detection; an approval for one message could be used to send a different one; the approval page could run attacker-supplied code; the encryption step stored data unencrypted if its key was missing; and the erasure step failed with an error. The new build is designed so each of these can't happen, and has a test for each.
@@ -97,7 +175,7 @@ packages/
   domain/             pure deterministic core: ids, action classes, canonical JSON, normalisers (no I/O; lint-enforced)
   clock/              the only source of time (lint-enforced)
   db/                 migrations, RLS machinery, tenant sessions, schema introspection
-  crypto/             KMS port, envelope encryption, blind indexes, rotation, crypto-shred
+  crypto/             KMS port and KEK ring (rotate, retire, revoke), envelope encryption with a key per business and per person, blind indexes, re-wrap, crypto-shred
   audit/              append, verify, signed checkpoints
   region/             region rule packs, live-tenant gate, cell routing
   egress/             allowlist (default deny); the only package allowed to make network calls
@@ -114,6 +192,11 @@ packages/
   autonomy/           reserved decisions (frozen), never-grantable classes, earned grants, kill switch (§7.2, INV-11)
   hitl/               structured questions, answers, acknowledgements, effect receipts, escalation sweep (§30, §74)
   identity/           tenant user and operator credentials, platform decisions, two-person sign-offs (§71, §82)
+  privacy/            erasure registry, per-person crypto-erasure, data-rights requests and copies, consent ledger, retention reports, shred register, key drills
+  finance/            VAT, double-entry ledger, invoices, the money port (Mode 1; Mode 2 locked), payment events, reconciliation
+  onboarding/         interview → records and a drafted pack, practice-enquiry tests, regulated-activity check, go-live checklist and activation, imports
+  lifecycle/          the journey engine: lifecycles as data (config/lifecycles), validated; idempotent, audited, authority-checked transitions; timers
+  metrics/            measurement views (row-level security applies), weekly owner report, the two must-be-zero floors
   llm/                model layer: provider port (Ollama via egress, VSAP stub, fake), versioned prompts, schema-checked tasks, registry selection, grounded model drafts
 apps/worker/          queue runner (NOTIFY wake-up, bounded concurrency); inbound.process; ack.send; enquiry.respond; draft.dispatch; outbox.reconcile; hitl.sweep; answer consumers
 eval/                 100-case labelled corpus, knowledge fixtures, runner, reports, accepted baseline
@@ -124,6 +207,7 @@ config/
   regions/uk.yaml     UK rule pack (counsel_signoff: null until counsel signs)
   egress.allowlist.yaml   default deny; each host names an approved processor
   processors.yaml         structured processor registry (§69); generates docs/PROCESSOR_REGISTER.md
+  lifecycles/             Lifecycle T (customer) and Lifecycle V (business, on the house tenant), as data
 tests/
   contract/registry.ts  every contract test id, its phase and section
   contract/phases.json  phases claimed delivered (the CI gate enforces their tests)
@@ -172,14 +256,18 @@ pnpm models:registry list|register|promote|retire   # owner role; promotion need
 - `contract-progress`: every contract test, red included, plus the status table. Informational.
 
 ### Contract test status
-Run `pnpm contract:status` for the live table. After Phases 6 and 18: F6, F8, T-RES, T-CHAOS, F22–F27, F46–F58 and T-SIGNOFF join F1 (database and API), F3 (grounding, property-based), F3H (holdout harness; starter cases only, DEV-009), F7 (ACK latency), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LLM, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
+Run `pnpm contract:status` for the live table. After Phases 6–14 and 18: T-CMP-1–4, T-BILL-1–3, T-ACC-1–2, F14–F18, T-ONB-1–5, T-PACK-1–2, F9–F13, T-LC-1–4, T-BOOK-1–3, T-SLO, F5, T-KEY-1–4, F6, F8, T-RES, T-CHAOS, F22–F27, F46–F58 and T-SIGNOFF join F1 (database and API), F3 (grounding, property-based), F3H (holdout harness; starter cases only, DEV-009), F7 (ACK latency), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LLM, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
 
 ### Documents
 - [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md): the binding contract (v1.13)
 - [`docs/ops/model-benchmark.md`](docs/ops/model-benchmark.md): how to benchmark and switch on a model on the VPS
 - [`docs/CONTRACT_REVIEW.md`](docs/CONTRACT_REVIEW.md): proposed amendments
-- [`docs/readiness/README.md`](docs/readiness/README.md): Production Readiness and Value Gate tracker
+- [`docs/readiness/README.md`](docs/readiness/README.md): Production Readiness, the full stress-test campaign, and the Value Gate
+- [`docs/security/key-management.md`](docs/security/key-management.md): the honest key threat model
+- [`docs/privacy/backups-and-erasure.md`](docs/privacy/backups-and-erasure.md): how erasure reaches backups
+- [`docs/reports/baseline-v1.md`](docs/reports/baseline-v1.md): the first measured baseline (Phase 8)
 - [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md): what's needed for pilots, for launch, or deferred
+- [`docs/IMPROVEMENTS.md`](docs/IMPROVEMENTS.md): every improvement found while building, and how it was built in
 - [`docs/DEVIATIONS.md`](docs/DEVIATIONS.md): every difference from the contract, with reasons
 - [`docs/QUESTIONS_FOR_DAN.md`](docs/QUESTIONS_FOR_DAN.md): open decisions
 - [`docs/reference/original-vision.md`](docs/reference/original-vision.md): your original Synchronicity / Operion vision mapped to the contract

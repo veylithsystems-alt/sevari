@@ -9,6 +9,7 @@ import type { VerticalPack } from './pack.ts';
 import { priceFor, type PriceAnswer } from './pricing.ts';
 import { proposeWindows, type Busy, type Window } from './availability.ts';
 import { ALWAYS_HUMAN_FLAGS, sensitiveFlags, type SensitiveFlag } from './sensitive.ts';
+import type { BookingFact } from './bookings.ts';
 import { extractSlots, type Slots } from './slots.ts';
 import { hasAffirmed, normaliseForMatch } from './text.ts';
 
@@ -35,6 +36,8 @@ export interface EnquiryAnalysis {
   readonly price?: PriceAnswer;
   readonly windows?: readonly Window[];
   readonly faqs: readonly string[];
+  /** The customer's upcoming booking, when the message is about it (follow-up, change, cancel). */
+  readonly booking?: BookingFact;
   readonly route: Route;
   readonly clarify?: { readonly about: string; readonly question: string };
   /** Citations: knowledge record id@version for every fact the reply may use (§10.2). */
@@ -52,6 +55,8 @@ export interface AnalyseInput {
   readonly pack: VerticalPack;
   readonly knowledge: KnowledgeSnapshot;
   readonly busy?: readonly Busy[];
+  /** This customer's next booking (held or confirmed), if they have one. */
+  readonly booking?: BookingFact;
   /** How many clarifying questions this conversation has already had (§30.4). */
   readonly clarificationsSoFar?: number;
   readonly maxClarifications?: number;
@@ -110,10 +115,17 @@ export function analyseEnquiry(input: AnalyseInput): EnquiryAnalysis {
   eligibility.missing.filter((m) => m.startsWith('knowledge:')).forEach((m) => factsMissing.add(m));
   const extra = { ...(price ? { price } : {}), ...(windows ? { windows } : {}) };
 
-  // Requests about an existing job need the booking record (lifecycle, Phase 9): UNKNOWN until then.
+  // Requests about an existing job are answered from the booking record (Phase 9); without one, UNKNOWN.
   if (intent.intent === 'follow_up' || intent.intent === 'reschedule' || intent.intent === 'cancel') {
-    factsMissing.add('booking_record');
-    return done('unknown', extra);
+    if (!input.booking) {
+      factsMissing.add('booking_record');
+      return done('unknown', extra);
+    }
+    factsUsed.add(`booking:${input.booking.id}`);
+    // A cancellation is answered by a confirmation a person always approves (cancel is never automatic, §7.2).
+    const withBooking = { ...extra, booking: input.booking };
+    if (intent.intent === 'reschedule' && factsMissing.size > 0) return done('unknown', withBooking);
+    return done('answer', withBooking);
   }
   // Clarify what the customer can tell us; UNKNOWN for what only the owner can.
   const required = REQUIRED_SLOTS[intent.intent] ?? [];
