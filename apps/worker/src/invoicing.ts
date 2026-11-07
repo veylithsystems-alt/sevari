@@ -112,40 +112,47 @@ export function invoicePrepareHandler(deps: InvoicingDeps) {
         const port = await withTenant(deps.db, scope, (tx) => moneyPortFor(tx, deps.payments as PaymentProcessor));
         link = await port.createPaymentLink({ reference: prep.invoiceId, amountMinor: prep.total, currency: prep.currency, description: prep.service });
       }
-      return withTenant(deps.db, scope, async (tx) => {
-        if (link) await tx.insertInto('payment_links').values({ tenant_id: scope.tenantId, region: scope.region, invoice_id: prep.invoiceId, provider: link.provider, provider_link_id: link.providerLinkId, url: link.url, amount_minor: prep.total, currency: prep.currency }).execute();
-        const snap = await snapshotAt(tx, deps.keyring, deps.clock.nowMs());
-        const business = snap.business?.body;
-        const c = await customerOf(deps, tx, prep.messageId);
-        if (!business || !c.channel || !c.recipient) throw new ContractViolation('§19.2', 'no business record or no way to reach the customer for an invoice');
-        const total = formatMoney(prep.total, prep.currency);
-        const r = render('invoice', c.channel, { business: business.trading_name, replyTime: business.reply_time_statement, privacyUrl: business.privacy_notice_url, discloseAutomation: false,
-          invoice: { service: prep.service, total, vatNote: vatNote(prep.vat), ...(link ? { link: link.url } : {}) } });
-        if (!r.ok) throw new ContractViolation('§19.2', `invoice template: ${r.reason}`);
-        const facts = [`Invoice total ${total}${vatNote(prep.vat)}.`, business.trading_name, ...(link ? [link.url] : [])];
-        const g = ground(r.text, 'reply', { factTexts: facts, factIds: [`invoice:${prep.invoiceId}`], customerText: '' }, { nowMs: deps.clock.nowMs(), timezone: snap.hours?.body.timezone ?? 'Europe/London' });
-        if (!g.ok) throw new ContractViolation('§19.2', `invoice message failed the fact check: ${g.failures.map((f) => f.detail).join('; ')}`);
-        const d = await createDraft(deps, tx, {
-          enquiryId: null, conversationId: c.conversationId, contactId: c.contactId, inReplyTo: null, channel: c.channel, recipient: c.recipient, purpose: 'reply',
-          actionClass: 'invoice_send', body: g.draft.text, sources: { factTexts: facts, factIds: [`invoice:${prep.invoiceId}`], customerText: '' }, generator: 'template', templateId: 'invoice', factsUsed: [`invoice:${prep.invoiceId}`],
-        });
-        await tx.updateTable('invoices').set({ send_draft_id: d.id }).where('id', '=', prep.invoiceId).execute();
-        const decision = await decide(tx, 'invoice_send');
-        if (decision.mode === 'granted') {
-          const s = await sendDraft(deps, tx, d.id, { kind: 'grant', grantId: decision.grantId });
-          if (s.status === 'queued') return 'sent_under_grant';
-        }
-        await ask({ keyring: deps.keyring, clock: deps.clock, consumers: deps.consumers }, tx, {
-          subjectContactId: c.contactId, kind: 'approve_draft', subjectRef: `draft:${d.id}`, actionClass: 'invoice_send', contentDigest: d.digest, requiredRole: 'owner',
-          body: { title: 'Invoice ready to send', summary: `For ${prep.service}: ${total}${vatNote(prep.vat)}. Approving issues the invoice (it gets its number then) and sends it${link ? ' with a payment link' : ''}.`, preview: g.draft.text, facts,
-            optionLabels: { approve: 'Send it', edit: 'Change the message', reject: 'Don\'t send' }, safeDefaultText: 'No invoice is issued or sent until you approve.' },
-          options: ['approve', 'edit', 'reject'], safeDefault: 'hold', consumer: { kind: 'draft.send', ref: d.id }, deadlineMs: 14 * 86_400_000,
-        });
-        await appendAudit(tx, { type: 'invoice.prepared', actor: { kind: 'system' }, subject: `invoice:${prep.invoiceId}`, payload: { total_minor: prep.total, link: Boolean(link) } });
-        return 'awaiting_approval';
-      });
+      return withTenant(deps.db, scope, (tx) => askToSendInvoice(deps, tx, { ...prep, link }));
     },
   };
+}
+
+
+/** The invoice message, grounded on the invoice record, put to the owner for approval (or sent under a grant). */
+export async function askToSendInvoice(deps: InvoicingDeps, tx: TenantTx, prep: Prepared & { link: { providerLinkId: string; url: string; provider: string } | null }): Promise<string> {
+  const scope = tx.scope;
+  const link = prep.link;
+  if (link) await tx.insertInto('payment_links').values({ tenant_id: scope.tenantId, region: scope.region, invoice_id: prep.invoiceId, provider: link.provider, provider_link_id: link.providerLinkId, url: link.url, amount_minor: prep.total, currency: prep.currency }).execute();
+  const snap = await snapshotAt(tx, deps.keyring, deps.clock.nowMs());
+  const business = snap.business?.body;
+  const c = await customerOf(deps, tx, prep.messageId);
+  if (!business || !c.channel || !c.recipient) throw new ContractViolation('§19.2', 'no business record or no way to reach the customer for an invoice');
+  const total = formatMoney(prep.total, prep.currency);
+  const r = render('invoice', c.channel, { business: business.trading_name, replyTime: business.reply_time_statement, privacyUrl: business.privacy_notice_url, discloseAutomation: false,
+    invoice: { service: prep.service, total, vatNote: vatNote(prep.vat), ...(link ? { link: link.url } : {}) } });
+  if (!r.ok) throw new ContractViolation('§19.2', `invoice template: ${r.reason}`);
+  // Every value in the message comes from the invoice record: what it is for, the total, the link.
+  const facts = [`Invoice for ${prep.service}.`, `Invoice total ${total}${vatNote(prep.vat)}.`, business.trading_name, ...(link ? [link.url] : [])];
+  const g = ground(r.text, 'reply', { factTexts: facts, factIds: [`invoice:${prep.invoiceId}`], customerText: '' }, { nowMs: deps.clock.nowMs(), timezone: snap.hours?.body.timezone ?? 'Europe/London' });
+  if (!g.ok) throw new ContractViolation('§19.2', `invoice message failed the fact check: ${g.failures.map((f) => f.detail).join('; ')}`);
+  const d = await createDraft(deps, tx, {
+    enquiryId: null, conversationId: c.conversationId, contactId: c.contactId, inReplyTo: null, channel: c.channel, recipient: c.recipient, purpose: 'reply',
+    actionClass: 'invoice_send', body: g.draft.text, sources: { factTexts: facts, factIds: [`invoice:${prep.invoiceId}`], customerText: '' }, generator: 'template', templateId: 'invoice', factsUsed: [`invoice:${prep.invoiceId}`],
+  });
+  await tx.updateTable('invoices').set({ send_draft_id: d.id }).where('id', '=', prep.invoiceId).execute();
+  const decision = await decide(tx, 'invoice_send');
+  if (decision.mode === 'granted') {
+    const s = await sendDraft(deps, tx, d.id, { kind: 'grant', grantId: decision.grantId });
+    if (s.status === 'queued') return 'sent_under_grant';
+  }
+  await ask({ keyring: deps.keyring, clock: deps.clock, consumers: deps.consumers }, tx, {
+    subjectContactId: c.contactId, kind: 'approve_draft', subjectRef: `draft:${d.id}`, actionClass: 'invoice_send', contentDigest: d.digest, requiredRole: 'owner',
+    body: { title: 'Invoice ready to send', summary: `For ${prep.service}: ${total}${vatNote(prep.vat)}. Approving issues the invoice (it gets its number then) and sends it${link ? ' with a payment link' : ''}.`, preview: g.draft.text, facts,
+      optionLabels: { approve: 'Send it', edit: 'Change the message', reject: 'Don\'t send' }, safeDefaultText: 'No invoice is issued or sent until you approve.' },
+    options: ['approve', 'edit', 'reject'], safeDefault: 'hold', consumer: { kind: 'draft.send', ref: d.id }, deadlineMs: 14 * 86_400_000,
+  });
+  await appendAudit(tx, { type: 'invoice.prepared', actor: { kind: 'system' }, subject: `invoice:${prep.invoiceId}`, payload: { total_minor: prep.total, link: Boolean(link) } });
+  return 'awaiting_approval';
 }
 
 /** Job invoice.chase: a reminder after the due date, on the owner's schedule, while anything is unpaid. */

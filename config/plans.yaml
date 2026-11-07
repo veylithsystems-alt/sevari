@@ -1,0 +1,16 @@
+# Plans and prices (§47): versioned data, never code. A version is used only once Dan approves it
+# (scripts/approve-plans.ts records his decision and writes these into the cell). Changing a price means
+# adding a version here with a later effective date; businesses on a founding-rate lock keep their rate.
+# PROPOSED, not approved: the contract's founding rate (£59 a month, ex VAT) as the first list price.
+# Dan's answer to Q-2 (which prices are current) decides the final figures.
+version: 1
+plans:
+  - plan_key: standard
+    plan_version: 1
+    name: Standard
+    price_minor: 5900
+    currency: GBP
+    vat_treatment: exclusive
+    allowances: { enquiries: 300, seats: 3, channels: 3 }
+    overage_per_enquiry_minor: 0
+    effective_from: "2026-11-01"

@@ -54,3 +54,12 @@ Most future changes are new data or a new adapter behind an existing port, not a
 | I-21 | A processor's "try later" and the money mode both have database guards: only Veylith's owner role can change how money flows | Phase 12 | Built, tested (F14) |
 
 Cross-business suppression (DEV-018) is a known gap with a plan: it is built before any sender class spans businesses.
+
+### Added in Phase 13
+
+| # | Improvement | Status |
+|---|---|---|
+| I-22 | Suspension for non-payment is guarded by the database: it needs Dan's recorded decision, so no bug or automation can suspend a business (§8.3) | Built, tested (T-BILL-2) |
+| I-23 | A plan version is usable only with an approval record; an unapproved price is ignored even if it's newer | Built, tested (T-BILL-3) |
+| I-24 | Invoice messages are fact-checked like replies: building billing showed the billing period dates must be cited from the record, or the message is blocked | Built, tested |
+| I-25 | Accounting tokens get a key of their own, so disconnecting destroys every copy, including backups | Built, tested (T-ACC-2) |

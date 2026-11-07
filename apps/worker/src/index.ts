@@ -9,3 +9,4 @@ export * from './journey.ts';
 export * from './bookings.ts';
 export { askPackConfirm, requestGoLive, onboardingConsumers } from '@sevari/onboarding';
 export * from './invoicing.ts';
+export * from './billing.ts';

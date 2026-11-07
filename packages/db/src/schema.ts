@@ -639,6 +639,21 @@ export interface ReconMatchesTable extends Meta, Tenant {
   status: 'auto_applied' | 'suggested' | 'confirmed' | 'rejected';
   decided_by: string | null;
 }
+export interface PlansTable extends Meta {
+  id: Generated<string>; region: string; plan_key: string; plan_version: number; name: string; price_minor: ColumnType<string, number | string, never>;
+  currency: string; vat_treatment: 'inclusive' | 'exclusive' | 'not_registered'; allowances: ColumnType<Record<string, unknown>, string, never>;
+  overage_per_enquiry_minor: ColumnType<string, number | string | undefined, never>; effective_from: ColumnType<string, string, never>; approval_decision_id: string | null;
+}
+export interface SubscriptionsTable extends Meta, Tenant {
+  business_tenant_id: string; contact_id: string; plan_key: string; pilot_until: ColumnType<string | null, string | null | undefined, never>;
+  founding_price_minor: ColumnType<string | null, number | null | undefined, never>; founding_lock_until: ColumnType<string | null, string | null | undefined, never>;
+  status: Generated<'pilot' | 'active' | 'past_due' | 'suspended' | 'cancelled'>; started_on: ColumnType<string, string, never>;
+  period_start: ColumnType<string, string, string>; period_end: ColumnType<string, string, string>; terms_input_id: string;
+}
+export interface BillingRunsTable extends Meta, Tenant { subscription_id: string; period_start: ColumnType<string, string, never>; period_end: ColumnType<string, string, never>; usage: ColumnType<Record<string, unknown>, string, never>; invoice_id: string | null }
+export interface AccountingConnectionsTable extends Meta, Tenant { provider: string; token_enc: Buffer | null; status: Generated<'connected' | 'disconnected' | 'error'>; connected_at: Date; disconnected_at: Date | null }
+export interface AccountingMappingsTable extends Meta, Tenant { connection_id: string; local_account: string; external_code: string }
+export interface AccountingSyncLogTable extends Meta, Tenant { connection_id: string; entity: 'invoice' | 'payment' | 'credit_note'; entity_id: string; idempotency_key: string; external_id: string | null; status: 'pushed' | 'failed'; error: string | null; attempted_at: Date }
 type ViewOf<T> = { readonly [K in keyof T]: T[K] };
 export type MetricsEnquiryFlowView = ViewOf<{
   tenant_id: string; region: string; enquiry_id: string; received_at: Date; analysed_at: Date; route: string; intent: string; intent_source: string; abstained: boolean;
@@ -709,6 +724,12 @@ export interface Database {
   payment_events: PaymentEventsTable;
   recon_lines: ReconLinesTable;
   recon_matches: ReconMatchesTable;
+  plans: PlansTable;
+  subscriptions: SubscriptionsTable;
+  billing_runs: BillingRunsTable;
+  accounting_connections: AccountingConnectionsTable;
+  accounting_mappings: AccountingMappingsTable;
+  accounting_sync_log: AccountingSyncLogTable;
 }
 
 export type QuestionRow = Selectable<HumanQuestionsTable>;

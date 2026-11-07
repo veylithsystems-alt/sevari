@@ -30,6 +30,7 @@ import { releaseHold, RELEASE_HOLD_JOB } from './bookings.ts';
 import { journeyConsumers, runEffect, runTimer, type Lifecycles } from './journey.ts';
 import { onboardingConsumers, type CellLive } from '@sevari/onboarding';
 import type { PaymentProcessor } from '@sevari/finance';
+import { BILLING_DUNNING_JOB, BILLING_RUN_JOB, BILLING_SUSPEND_JOB, billingRunHandler, dunningCheck, suspendHandler } from './billing.ts';
 import { chaseInvoice, INVOICE_CHASE_JOB, INVOICE_PREPARE_JOB, invoicePrepareHandler, invoicingConsumers } from './invoicing.ts';
 import { respond } from './respond.ts';
 import type { JobHandler } from './runner.ts';
@@ -102,6 +103,9 @@ export function workerHandlers(deps: WorkerDeps): { handlers: Record<string, Job
     [RELEASE_HOLD_JOB]: (tx, p) => releaseHold(deps, tx, String(p['booking_id'])),
     [INVOICE_PREPARE_JOB]: invoicePrepareHandler({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers, ...(deps.payments ? { payments: deps.payments } : {}) }),
     [INVOICE_CHASE_JOB]: (tx, p) => chaseInvoice({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers }, tx, p),
+    [BILLING_RUN_JOB]: billingRunHandler({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers, ...(deps.payments ? { payments: deps.payments } : {}) }),
+    [BILLING_DUNNING_JOB]: (tx, p) => dunningCheck({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers }, tx, p),
+    [BILLING_SUSPEND_JOB]: suspendHandler({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers }),
     [WEEKLY_REPORT_JOB]: async (tx, p) => {
       // Never report a week that hasn't finished, whatever the queue's timing says.
       if (deps.clock.nowMs() < Number(p['period_end'])) throw new Error('week not finished yet');

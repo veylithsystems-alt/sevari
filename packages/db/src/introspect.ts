@@ -8,6 +8,7 @@ export const GLOBAL_TABLES: Readonly<Record<string, string>> = {
   schema_migrations: 'migration ledger, no personal data',
   model_registry: 'cell model registry (§9), no personal data',
   purpose_rules: 'purpose limitation per source tier (§17.2), no personal data',
+  plans: 'versioned plans and prices (§47), no personal data',
   platform_decisions: 'platform-scope decisions (§82); references and reason codes only',
   operators: 'platform operator credentials (§82 platform scope); cell-global, not tenant data',
 };
