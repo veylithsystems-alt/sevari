@@ -189,12 +189,14 @@ contractSuite('F26', () => {
   it('an owner-only question can\'t be answered by an approver, even one with permissions', async () => {
     const m = await x.send('I want to make a formal complaint about the engineer who visited.');
     const r = await x.process(m.messageId);
-    const q = await x.question(`enquiry:${r.enquiryId}`);
-    expect(q?.kind).toBe('owner_task');
-    const a = await x.answer({ questionId: q!.id, responderId: x.approver, response: 'handled', digestSeen: q!.digest });
+    // A complaint opens a case (Phase 14, §20); deciding it is owner-only.
+    const k = await withTenant(x.h.db, x.t, (tx) => tx.selectFrom('complaint_cases').select('id').where('enquiry_id', '=', r.enquiryId).executeTakeFirstOrThrow());
+    const q = await x.question(`complaint:${k.id}`);
+    expect(q?.kind).toBe('complaint');
+    const a = await x.answer({ questionId: q!.id, responderId: x.approver, response: 'resolved', digestSeen: q!.digest });
     expect(a).toMatchObject({ accepted: false, reason: 'wrong_role' });
     x.clock.advance(10_000);
-    expect((await x.answer({ questionId: q!.id, responderId: x.owner, response: 'handled', digestSeen: q!.digest })).accepted).toBe(true);
+    expect((await x.answer({ questionId: q!.id, responderId: x.owner, response: 'resolved', digestSeen: q!.digest })).accepted).toBe(true);
   });
 });
 

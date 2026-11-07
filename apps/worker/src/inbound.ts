@@ -98,6 +98,8 @@ export async function processInbound(deps: InboundDeps, tx: TenantTx, messageId:
     analysis_enc: await deps.keyring.seal(tx, { table: 'enquiries', column: 'analysis_enc', rowId: enquiryId, subject: msg.contact_id }, JSON.stringify(a)),
     analysed_at: deps.clock.now(),
   }).execute();
+  // Extra care, from the first message that shows it: nothing is ever sent to this person automatically (§22).
+  if (a.flags.includes('vulnerable_customer')) await tx.updateTable('contacts').set({ vulnerable_flag: true }).where('id', '=', msg.contact_id).execute();
   await enqueue(tx, { kind: RESPOND_JOB, dedupeKey: enquiryId, payload: { enquiry_id: enquiryId } });
   // The person's journey (§16): first contact starts it; an opt-out or complaint moves it at once.
   const event = a.route === 'opt_out' ? 'opted_out' : a.intent.intent === 'complaint' || a.flags.includes('complaint') ? 'complaint_opened' : 'enquiry_received';

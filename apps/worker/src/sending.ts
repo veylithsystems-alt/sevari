@@ -158,6 +158,12 @@ export async function sendDraft(deps: SendDeps, tx: TenantTx, draftId: string, a
     approvalId = await createApproval(tx, { draftId, actionClass: d.row.action_class, digest, approverId: authority.approverId, inputId: authority.inputId });
     if (!(await consumeApproval(tx, approvalId, digest))) return { status: 'refused', reason: 'approval' };
   } else {
+    // A customer who may need extra care is never sent anything automatically (§22, T-CMP-4).
+    const vulnerable = await tx.selectFrom('contacts').select('vulnerable_flag').where('id', '=', d.row.contact_id).executeTakeFirst();
+    if (vulnerable?.vulnerable_flag) {
+      await appendAudit(tx, { type: 'draft.grant_refused', actor: { kind: 'system' }, subject: `draft:${draftId}`, payload: { reason: 'vulnerable_customer' } });
+      return { status: 'refused', reason: 'approval' };
+    }
     const live = await tx.selectFrom('autonomy_grants').select('id').where('id', '=', authority.grantId).where('revoked_at', 'is', null).where('action_class', '=', d.row.action_class).executeTakeFirst();
     if (!live) return { status: 'refused', reason: 'approval' };
   }

@@ -25,6 +25,7 @@ export function recordKey(body: AnyKnowledge, discriminator?: string): string {
     case 'price': return `price:${body.service_code}:${body.basis}`;
     case 'policy': return `policy:${body.topic}`;
     case 'faq': return `faq:${discriminator ?? 'q'}`;
+    case 'resolution_policy': return 'resolution_policy';
   }
 }
 

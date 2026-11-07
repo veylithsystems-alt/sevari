@@ -63,3 +63,12 @@ Cross-business suppression (DEV-018) is a known gap with a plan: it is built bef
 | I-23 | A plan version is usable only with an approval record; an unapproved price is ignored even if it's newer | Built, tested (T-BILL-3) |
 | I-24 | Invoice messages are fact-checked like replies: building billing showed the billing period dates must be cited from the record, or the message is blocked | Built, tested |
 | I-25 | Accounting tokens get a key of their own, so disconnecting destroys every copy, including backups | Built, tested (T-ACC-2) |
+
+### Added in Phase 14
+
+| # | Improvement | Status |
+|---|---|---|
+| I-26 | Choosing a remedy drafts the exact message for approval, instead of sending text the owner hasn't seen: an approval only ever covers the words a person saw (§7.1) | Built, tested (T-CMP-2) |
+| I-27 | The customer journey no longer asks its own "is it resolved?" question alongside the complaint case: one case, one owner, one clock | Built (lifecycle files v3/v2) |
+| I-28 | A customer flagged for extra care is protected at the point of sending, so no path, including earned permissions, can send to them automatically | Built, tested (T-CMP-4) |
+| I-29 | The database refuses an open complaint without an owner, or a closed one without a root cause | Built, tested |

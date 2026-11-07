@@ -28,7 +28,8 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 | 11 | Onboarding: a business sets itself up and taps "go live" | ✅ Done (screens in the owner app come next) |
 | 12 | Invoices, payment links and chasing | ✅ Done (real payment provider awaits your choice, Q-24) |
 | 13 | Billing for Sevari itself (subscriptions), and accounting software sync | ✅ Done (prices await your answer to Q-2; accounting platforms each need your approval) |
-| 14–15 | Complaints and disputes; leaving Sevari, data export, customer portal | Next |
+| 14 | Complaints and disputes | ✅ Done |
+| 15 | Leaving Sevari, data export, handing cases to others, customer portal | Next |
 | 16+ | Missed-call texts, finance, complaints, offboarding, learning, hardening | Planned |
 | K1–K6 | **Agent Mode**: the seven agents (BASTION, SENTINEL, LEDGER, VANGUARD, HERALD, COMPASS, FORGE) as plug-in packs | Planned (after approvals are built) |
 
@@ -126,6 +127,13 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
   - Each period is billed exactly once.
   - **If a business doesn't pay**, reminders go out with your approval and you're told when they're 14 days overdue. **Sevari never suspends anyone by itself:** suspension needs your recorded decision after a notice period, and the database refuses it otherwise.
 - **Accounting software sync** (Xero, QuickBooks, FreeAgent once each is approved): every invoice and payment is pushed to the business's books exactly once. A failed push becomes a task for the owner, and disconnecting destroys the access key for good.
+- **Complaints are handled properly, not lost.**
+  - Every complaint opens a case with a named owner and a clock (your resolution policy's response time, or 7 days). If it isn't resolved in time, you get an alert.
+  - **Legal threats, regulators, safeguarding, discrimination, injury, the press and vulnerable customers** go straight to you. The customer gets only a polite holding reply.
+  - For everyday complaints, you pick a remedy from your own written resolution policy (an apology, a redo, or a refund or credit up to your limit). Sevari drafts the exact message for you to approve. Anything over your limit is refused; to offer more, you write it yourself. The AI can never offer compensation by itself.
+  - Closing a case records the main cause, so patterns show up.
+  - **Customers who may need extra care** are never sent anything automatically, even where you've let Sevari send by itself.
+  - **For a payment dispute or chargeback**, Sevari assembles the evidence (invoice, payments, ledger, history, conversation) for you to check and submit.
 - Sevari can't connect to any outside service unless you've approved that supplier. This is enforced three ways: in the code, by a gatekeeper process, and by the server's firewall (proven by a test). The supplier list (processor register) is generated automatically and currently lists one approved supplier: Brevo, for email.
 
 **Your decisions of 14 October (contract v1.12, Part L):**
@@ -248,7 +256,7 @@ pnpm models:registry list|register|promote|retire   # owner role; promotion need
 - `contract-progress`: every contract test, red included, plus the status table. Informational.
 
 ### Contract test status
-Run `pnpm contract:status` for the live table. After Phases 6–13 and 18: T-BILL-1–3, T-ACC-1–2, F14–F18, T-ONB-1–5, T-PACK-1–2, F9–F13, T-LC-1–4, T-BOOK-1–3, T-SLO, F5, T-KEY-1–4, F6, F8, T-RES, T-CHAOS, F22–F27, F46–F58 and T-SIGNOFF join F1 (database and API), F3 (grounding, property-based), F3H (holdout harness; starter cases only, DEV-009), F7 (ACK latency), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LLM, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
+Run `pnpm contract:status` for the live table. After Phases 6–14 and 18: T-CMP-1–4, T-BILL-1–3, T-ACC-1–2, F14–F18, T-ONB-1–5, T-PACK-1–2, F9–F13, T-LC-1–4, T-BOOK-1–3, T-SLO, F5, T-KEY-1–4, F6, F8, T-RES, T-CHAOS, F22–F27, F46–F58 and T-SIGNOFF join F1 (database and API), F3 (grounding, property-based), F3H (holdout harness; starter cases only, DEV-009), F7 (ACK latency), F2 (static, client, proxy, firewall), F4, T-AUD, T-BOOT, T-MIG, T-IDEM, T-PROC, T-LLM, T-LINT and T-SEC are green; every other F/T test exists and is red until its phase is built.
 
 ### Documents
 - [`docs/BUILD_CONTRACT.md`](docs/BUILD_CONTRACT.md): the binding contract (v1.13)

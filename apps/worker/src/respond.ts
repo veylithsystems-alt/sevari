@@ -19,6 +19,7 @@ import { snapshotAt } from '@sevari/knowledge';
 import { recordReply } from '@sevari/outbound';
 import { render } from '@sevari/templates';
 import { holdSlot, liveOffer, recordOffer } from './bookings.ts';
+import { openComplaint } from './complaints.ts';
 import type { Lifecycles } from './journey.ts';
 import { createDraft, sendDraft } from './sending.ts';
 
@@ -71,7 +72,14 @@ export async function respond(deps: RespondDeps, tx: TenantTx, enquiryId: string
     await rightsRequest(deps, tx, enquiryId, c);
     return { outcome: 'dsar_opened' };
   }
+  // Complaints and their always-human cousins open a case with a clock and an owner (§20).
+  const COMPLAINT_FLAGS = ['complaint', 'legal_threat', 'regulator', 'safeguarding', 'discrimination', 'injury_or_damage', 'media'];
+  if (e.route === 'human_only' && (a.intent.intent === 'complaint' || a.flags.some((f) => COMPLAINT_FLAGS.includes(f)))) {
+    await openComplaint(deps, tx, { enquiryId, contactId: c.contactId, conversationId: c.conversationId, messageId: c.messageId, flags: a.flags, text: c.text });
+    return { outcome: 'complaint_case' };
+  }
   if (e.route === 'human_only') {
+    if (a.flags.includes('vulnerable_customer')) await tx.updateTable('contacts').set({ vulnerable_flag: true }).where('id', '=', c.contactId).execute();
     await ownerTask('This one needs you', 'Sevari does not answer this kind of message by itself. The customer has had a holding reply.', a.flags.map((fl) => `Flag: ${fl.replace(/_/g, ' ')}`));
     return { outcome: 'owner_task' };
   }

@@ -1,7 +1,7 @@
 # Lifecycle V (§16): Veylith and the businesses that use Sevari. It runs on the house tenant (Veylith's
 # own account in the cell) on exactly the same engine as every customer journey: dogfooded.
 id: business_journey
-version: 1
+version: 2
 lifecycle: V
 subject_type: business
 description: A business from first contact with Veylith, through contract and onboarding, to renewal or exit.
@@ -105,16 +105,7 @@ transitions:
           deadline_hours: 720
           safe_default_text: Their account stays as it is until you confirm.
   - { from: [offboarding], event: exited, to: exited, human: true }
-  - from: "*"
-    event: complaint_opened
-    to: in_dispute
-    effects:
-      - ask_owner:
-          title: When the complaint is resolved, tell Sevari
-          summary: A business has complained. Nothing automatic goes to them until it is resolved.
-          options:
-            - { event: complaint_resolved, label: It's resolved }
-          deadline_hours: 720
-          safe_default_text: The complaint stays open.
-  - { from: [in_dispute], event: complaint_resolved, to: resolved, human: true }
+  # The complaint itself is a case with its own clock and owner (§20); the journey just marks it open.
+  - { from: "*", event: complaint_opened, to: in_dispute }
+  - { from: [in_dispute], event: complaint_resolved, to: resolved }
   - { from: "*", event: opted_out, to: opted_out }

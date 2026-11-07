@@ -156,7 +156,7 @@ export interface KnowledgeRecordsTable extends Meta {
   tenant_id: string;
   region: string;
   record_key: string;
-  kind: 'service' | 'price' | 'hours' | 'area' | 'policy' | 'faq' | 'business';
+  kind: 'service' | 'price' | 'hours' | 'area' | 'policy' | 'faq' | 'business' | 'resolution_policy';
   record_version: number;
   body_enc: Buffer;
   status: Generated<'draft' | 'confirmed' | 'retired' | 'rejected'>;
@@ -330,7 +330,7 @@ export interface AutonomyGrantsTable extends Meta, Tenant {
   revoked_at: Date | null;
   revoke_reason: string | null;
 }
-export type QuestionKind = 'approve_draft' | 'clarify_edit' | 'owner_task' | 'autonomy_grant' | 'knowledge_update' | 'dsar_release' | 'lifecycle_step' | 'go_live' | 'pack_confirm';
+export type QuestionKind = 'approve_draft' | 'clarify_edit' | 'owner_task' | 'autonomy_grant' | 'knowledge_update' | 'dsar_release' | 'lifecycle_step' | 'go_live' | 'pack_confirm' | 'complaint';
 export type SafeDefault = 'hold' | 'reask' | 'escalate' | 'fail_closed';
 export interface HumanQuestionsTable extends Meta, Tenant {
   kind: QuestionKind;
@@ -654,6 +654,11 @@ export interface BillingRunsTable extends Meta, Tenant { subscription_id: string
 export interface AccountingConnectionsTable extends Meta, Tenant { provider: string; token_enc: Buffer | null; status: Generated<'connected' | 'disconnected' | 'error'>; connected_at: Date; disconnected_at: Date | null }
 export interface AccountingMappingsTable extends Meta, Tenant { connection_id: string; local_account: string; external_code: string }
 export interface AccountingSyncLogTable extends Meta, Tenant { connection_id: string; entity: 'invoice' | 'payment' | 'credit_note'; entity_id: string; idempotency_key: string; external_id: string | null; status: 'pushed' | 'failed'; error: string | null; attempted_at: Date }
+export interface ComplaintCasesTable extends Meta, Tenant {
+  contact_id: string | null; enquiry_id: string | null; conversation_id: string | null; category: 'standard' | 'always_human'; reasons: Generated<string[]>;
+  status: Generated<'open' | 'remedy_proposed' | 'resolved' | 'closed'>; assigned_user_id: string | null; opened_at: Date; respond_by: Date; breached_at: Date | null; resolved_at: Date | null;
+  remedy: ColumnType<Record<string, unknown> | null, string | null | undefined, string | null>; root_cause: 'workmanship' | 'communication' | 'price' | 'timing' | 'damage' | 'no_fault' | 'other' | null; satisfaction_opt_in: boolean | null;
+}
 type ViewOf<T> = { readonly [K in keyof T]: T[K] };
 export type MetricsEnquiryFlowView = ViewOf<{
   tenant_id: string; region: string; enquiry_id: string; received_at: Date; analysed_at: Date; route: string; intent: string; intent_source: string; abstained: boolean;
@@ -730,6 +735,7 @@ export interface Database {
   accounting_connections: AccountingConnectionsTable;
   accounting_mappings: AccountingMappingsTable;
   accounting_sync_log: AccountingSyncLogTable;
+  complaint_cases: ComplaintCasesTable;
 }
 
 export type QuestionRow = Selectable<HumanQuestionsTable>;

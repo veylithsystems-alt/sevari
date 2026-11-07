@@ -1,7 +1,7 @@
 # Lifecycle T (§16): a tenant business and its own customer. Data, not code: change it here, the engine
 # validates it at start-up (states reachable, one step per state and event, all 12 stages covered).
 id: customer_journey
-version: 2
+version: 3
 lifecycle: T
 subject_type: customer
 description: A customer of a business using Sevari, from first message to repeat customer or exit.
@@ -51,16 +51,7 @@ transitions:
   - { from: [awaiting_outcome], event: job_missed, to: missed, effects: [{ set_booking_status: no_show }] }
   - { from: [completed], event: went_quiet, to: dormant }
   - { from: [missed], event: went_quiet, to: lost }
-  - from: "*"
-    event: complaint_opened
-    to: in_dispute
-    effects:
-      - ask_owner:
-          title: When the complaint is resolved, tell Sevari
-          summary: A customer has complained. Sevari has sent them a holding reply and will not send them anything automatic until you mark it resolved.
-          options:
-            - { event: complaint_resolved, label: It's resolved }
-          deadline_hours: 720
-          safe_default_text: The complaint stays open, and nothing automatic is sent to this customer.
-  - { from: [in_dispute], event: complaint_resolved, to: completed, human: true }
+  # The complaint itself is a case with its own clock and owner (§20); the journey just marks it open.
+  - { from: "*", event: complaint_opened, to: in_dispute }
+  - { from: [in_dispute], event: complaint_resolved, to: completed }
   - { from: "*", event: opted_out, to: opted_out }

@@ -31,6 +31,7 @@ import { journeyConsumers, runEffect, runTimer, type Lifecycles } from './journe
 import { onboardingConsumers, type CellLive } from '@sevari/onboarding';
 import type { PaymentProcessor } from '@sevari/finance';
 import { BILLING_DUNNING_JOB, BILLING_RUN_JOB, BILLING_SUSPEND_JOB, billingRunHandler, dunningCheck, suspendHandler } from './billing.ts';
+import { COMPLAINT_CLOCK_JOB, complaintClock, complaintConsumers } from './complaints.ts';
 import { chaseInvoice, INVOICE_CHASE_JOB, INVOICE_PREPARE_JOB, invoicePrepareHandler, invoicingConsumers } from './invoicing.ts';
 import { respond } from './respond.ts';
 import type { JobHandler } from './runner.ts';
@@ -61,6 +62,7 @@ export function workerHandlers(deps: WorkerDeps): { handlers: Record<string, Job
   const consumers = makeConsumers({ keyring: deps.keyring, clock: deps.clock, ...lc, ...(deps.publicBaseUrl ? { publicBaseUrl: deps.publicBaseUrl } : {}) });
   Object.assign(consumers, journeyConsumers({ keyring: deps.keyring, clock: deps.clock, ...lc }));
   Object.assign(consumers, invoicingConsumers());
+  Object.assign(consumers, complaintConsumers({ keyring: deps.keyring, clock: deps.clock, consumers, ...lc }));
   Object.assign(consumers, onboardingConsumers({ keyring: deps.keyring, clock: deps.clock, ...(deps.cellLive ? { cellLive: deps.cellLive } : {}) }));
   const hitl = { keyring: deps.keyring, clock: deps.clock, consumers, ...lc };
 
@@ -103,6 +105,7 @@ export function workerHandlers(deps: WorkerDeps): { handlers: Record<string, Job
     [RELEASE_HOLD_JOB]: (tx, p) => releaseHold(deps, tx, String(p['booking_id'])),
     [INVOICE_PREPARE_JOB]: invoicePrepareHandler({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers, ...(deps.payments ? { payments: deps.payments } : {}) }),
     [INVOICE_CHASE_JOB]: (tx, p) => chaseInvoice({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers }, tx, p),
+    [COMPLAINT_CLOCK_JOB]: (tx, p) => complaintClock(hitl, tx, String(p['case_id'])),
     [BILLING_RUN_JOB]: billingRunHandler({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers, ...(deps.payments ? { payments: deps.payments } : {}) }),
     [BILLING_DUNNING_JOB]: (tx, p) => dunningCheck({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers }, tx, p),
     [BILLING_SUSPEND_JOB]: suspendHandler({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers }),
