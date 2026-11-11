@@ -72,3 +72,14 @@ Cross-business suppression (DEV-018) is a known gap with a plan: it is built bef
 | I-27 | The customer journey no longer asks its own "is it resolved?" question alongside the complaint case: one case, one owner, one clock | Built (lifecycle files v3/v2) |
 | I-28 | A customer flagged for extra care is protected at the point of sending, so no path, including earned permissions, can send to them automatically | Built, tested (T-CMP-4) |
 | I-29 | The database refuses an open complaint without an owner, or a closed one without a root cause | Built, tested |
+
+### Added in Phase 15
+
+| # | Improvement | Status |
+|---|---|---|
+| I-30 | The database refuses a partner who processes data for a business unless a data processing agreement is on record, so a handover can't go to a processor without one | Built, tested (F19) |
+| I-31 | A refused handover is recorded in the tamper-proof record even though nothing was shared, so refusals can be audited | Built, tested (F19) |
+| I-32 | Checking the contract line by line found two gaps: leaving had no final bill, and a business couldn't change its mind. Both built: a final bill for the days used, then the subscription ends; cancelling during the notice stops both the bill and the deletion | Built, tested |
+| I-33 | The erasure certificate lists what was kept and why (tax records, with no link to any person), not just what was deleted | Built, tested (F21) |
+| I-34 | Switching off a team member's login hands their open cases to the owner in the same step, so a case can never be left without an owner | Built, tested (T-OFF-1) |
+| I-35 | Customer portal links are stored only as a scrambled copy and expire, and the page loads nothing from anywhere else and runs no scripts | Built, tested |

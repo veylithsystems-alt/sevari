@@ -167,6 +167,9 @@ importers:
       '@sevari/intake':
         specifier: workspace:*
         version: link:../../packages/intake
+      '@sevari/knowledge':
+        specifier: workspace:*
+        version: link:../../packages/knowledge
       '@sevari/onboarding':
         specifier: workspace:*
         version: link:../../packages/onboarding
@@ -604,6 +607,9 @@ importers:
       '@sevari/domain':
         specifier: workspace:*
         version: link:../domain
+      '@sevari/outbound':
+        specifier: workspace:*
+        version: link:../outbound
 
   packages/region:
     dependencies:

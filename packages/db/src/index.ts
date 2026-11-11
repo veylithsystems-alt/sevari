@@ -5,3 +5,4 @@ export * from './lookup.ts';
 export type * from './schema.ts';
 export * from './outbound-repo.ts';
 export * from './models-admin.ts';
+export * from './export-repo.ts';

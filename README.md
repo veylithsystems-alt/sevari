@@ -8,7 +8,7 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 
 ## For Dan: where things stand (plain English)
 
-**Last updated:** 7 November 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.13
+**Last updated:** 11 November 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.13
 
 **Status: build in progress.** Under contract Part J there are three separate milestones: *build-complete* (code and tests done), *production-approved* (deployment, recovery, security, support, legal documents all proven: [`docs/readiness/`](docs/readiness/README.md)), and *commercially launched* (pilots prove the product is worth paying for: the Value Gate). Passing automated tests is **not** evidence that Sevari is ready for paying customers.
 
@@ -29,7 +29,8 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 | 12 | Invoices, payment links and chasing | ✅ Done (real payment provider awaits your choice, Q-24) |
 | 13 | Billing for Sevari itself (subscriptions), and accounting software sync | ✅ Done (prices await your answer to Q-2; accounting platforms each need your approval) |
 | 14 | Complaints and disputes | ✅ Done |
-| 15 | Leaving Sevari, data export, handing cases to others, customer portal | Next |
+| 15 | Leaving Sevari, data export, handing cases to others, customer portal | ✅ Done (notice and grace lengths await your answer to Q-25) |
+| Next | Owner app screens (sign-up, onboarding, morning brief), inbound email through Brevo, the deployment kit | Next |
 | 16+ | Missed-call texts, finance, complaints, offboarding, learning, hardening | Planned |
 | K1–K6 | **Agent Mode**: the seven agents (BASTION, SENTINEL, LEDGER, VANGUARD, HERALD, COMPASS, FORGE) as plug-in packs | Planned (after approvals are built) |
 
@@ -134,6 +135,13 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
   - Closing a case records the main cause, so patterns show up.
   - **Customers who may need extra care** are never sent anything automatically, even where you've let Sevari send by itself.
   - **For a payment dispute or chargeback**, Sevari assembles the evidence (invoice, payments, ledger, history, conversation) for you to check and submit.
+- **Leaving Sevari is fair, complete and can't be done by accident.**
+  - A business that wants to leave gives notice (30 days), then has a grace period (30 days) to download everything. Their full data export is ready straight away: a machine-readable copy of their customers, messages, bookings, invoices and records, containing only what the data register lists.
+  - At the end of the notice they get a **final bill for the days used only**, and their subscription ends. If they change their mind before the end, they cancel with one tap: nothing is deleted and there is no final bill.
+  - **Nothing is deleted until the grace period has passed and you have recorded the decision.** Then Sevari disconnects their accounting link, switches off their channels, destroys their keys and deletes their customers. It issues a certificate that lists what was erased and what was kept, and why: tax records are kept for six years, with no link to any person.
+- **Handing a case to someone else** (a subcontractor, specialist, partner firm, insurer, regulator or debt collector) always needs the owner's approval. It names who, why, on what legal basis, and exactly which details are shared. The recipient must be an approved supplier or a partner the business has registered. A partner who processes data for them must have a data agreement on record; the database refuses one without it. Refusals are recorded too.
+- **No case is ever left without an owner.** If a team member's login is switched off, their open cases move to the business owner automatically.
+- **Customers get their own private page** from a secure link (it expires after 30 days, and only a scrambled copy is stored). It shows their bookings and invoices, and has two one-click buttons: "stop marketing" and "stop all messages". Both take effect at once and are recorded in the consent record.
 - Sevari can't connect to any outside service unless you've approved that supplier. This is enforced three ways: in the code, by a gatekeeper process, and by the server's firewall (proven by a test). The supplier list (processor register) is generated automatically and currently lists one approved supplier: Brevo, for email.
 
 **Your decisions of 14 October (contract v1.12, Part L):**

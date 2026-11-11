@@ -56,6 +56,10 @@ export const ERASURE_REGISTRY: Readonly<Record<string, TableEntry>> = {
   accounting_mappings: { purpose: 'account code mapping for accounting sync', lawfulBasis: 'contract', category: 'none', retention: H(null, 'tenant_exit'), erasure: 'none', columns: {} },
   accounting_sync_log: { purpose: 'what was pushed to the business\'s books, and when (§19.5)', lawfulBasis: 'legal obligation (accounting records)', category: 'financial', retention: H(2190, 'created'), erasure: 'retain-legal-hold', legalHoldReason: 'Ids and outcomes only.', columns: {} },
   complaint_cases: { purpose: 'complaint cases: clock, owner, remedy within policy, root cause (§20)', lawfulBasis: 'legal obligation; legitimate interests (handling complaints)', category: 'contact', retention: H(2190, 'created'), erasure: 'anonymise', columns: {} },
+  partners: { purpose: 'who a business may hand a case to, and on what basis (§21.3)', lawfulBasis: 'legal obligation (accountability)', category: 'contact', retention: H(null, 'tenant_exit'), erasure: 'delete', columns: { name: { category: 'contact', erasure: 'delete', dsar: false, note: 'a sole-trader partner\'s name' } } },
+  offloads: { purpose: 'handovers of a case to a third party, with basis and minimum data (§21.3)', lawfulBasis: 'as the case', category: 'contact', retention: H(2190, 'created'), erasure: 'delete', columns: { bundle_enc: enc() } },
+  tenant_offboardings: { purpose: 'a business leaving: notice, export, grace, erasure certificate (§21.1)', lawfulBasis: 'legal obligation (accountability)', category: 'none', retention: H(null, 'never'), erasure: 'none', columns: {} },
+  portal_tokens: { purpose: 'magic links to a customer\'s own page (§22)', lawfulBasis: 'contract', category: 'contact', retention: H(30, 'created'), erasure: 'delete', columns: { token_hash: { category: 'contact', erasure: 'delete', dsar: false, note: 'hash of a link' } } },
   tenant_activations: { purpose: 'go-live decisions and their checklists (§18, §81)', lawfulBasis: 'legitimate interests (accountability)', category: 'none', retention: H(null, 'tenant_exit'), erasure: 'none', columns: {} },
   tenant_packs: { purpose: 'each business\'s drafted and confirmed pack (§83.2)', lawfulBasis: 'contract', category: 'none', retention: H(null, 'tenant_exit'), erasure: 'none', columns: {} },
   data_imports: { purpose: 'record of each data import and its lawful basis (§18)', lawfulBasis: 'legal obligation (accountability)', category: 'none', retention: H(2190, 'created'), erasure: 'none', columns: {} },
@@ -122,7 +126,7 @@ export const ERASURE_REGISTRY: Readonly<Record<string, TableEntry>> = {
   },
   channel_endpoints: { purpose: 'routing inbound channels to a tenant', lawfulBasis: 'contract', category: 'none', retention: H(null, 'tenant_exit'), erasure: 'delete', columns: {} },
   api_keys: { purpose: 'tenant API authentication', lawfulBasis: 'contract / security', category: 'none', retention: H(null, 'tenant_exit'), erasure: 'delete', columns: {} },
-  knowledge_records: { purpose: 'owner-confirmed business facts (I5)', lawfulBasis: 'contract', category: 'contact', retention: H(null, 'tenant_exit'), erasure: 'crypto-shred', columns: {} },
+  knowledge_records: { purpose: 'owner-confirmed business facts (I5)', lawfulBasis: 'contract', category: 'contact', retention: H(null, 'tenant_exit'), erasure: 'crypto-shred', columns: { body_enc: { category: 'none', erasure: 'crypto-shred', dsar: false, note: 'the business\'s own facts; in its export, not in a person\'s copy' } } },
   enquiries: {
     purpose: 'deterministic analysis of each enquiry (§5.2, §10.2)', lawfulBasis: 'as the contact', category: 'contact', retention: H(730, 'relationship_end'), erasure: 'delete',
     columns: {
@@ -159,4 +163,35 @@ export function registryGaps(
     if (e.erasure === 'retain-legal-hold' && !e.legalHoldReason) gaps.push(`${t}: retain-legal-hold needs a reason`);
   }
   return gaps;
+}
+
+/**
+ * What a business's own data export contains (§21.1, F20): per table, plain columns, and sealed columns that
+ * are opened for the export. Every sealed column must be declared in the registry above, and nothing outside
+ * this list is ever exported.
+ */
+export const TENANT_EXPORT: Readonly<Record<string, { readonly plain: readonly string[]; readonly sealed?: readonly string[] }>> = {
+  contacts: { plain: ['id', 'source', 'lawful_basis', 'captured_at', 'subscriber_type'], sealed: ['display_name_enc', 'email_enc', 'phone_enc'] },
+  messages: { plain: ['id', 'conversation_id', 'direction', 'channel', 'received_at'], sealed: ['subject_enc', 'body_enc'] },
+  enquiries: { plain: ['id', 'message_id', 'intent', 'route', 'services', 'analysed_at'] },
+  bookings: { plain: ['id', 'contact_id', 'service', 'starts_at', 'ends_at', 'status'] },
+  invoices: { plain: ['id', 'number', 'contact_id', 'kind', 'status', 'currency', 'net_minor', 'vat_minor', 'total_minor', 'paid_minor', 'issued_at', 'due_on'] },
+  invoice_lines: { plain: ['invoice_id', 'position', 'description', 'quantity', 'unit_minor', 'amount_minor'] },
+  payment_events: { plain: ['invoice_id', 'kind', 'amount_minor', 'fee_minor', 'currency', 'occurred_at'] },
+  consents: { plain: ['contact_id', 'purpose', 'channel', 'action', 'basis', 'source', 'wording_version', 'recorded_at'] },
+  knowledge_records: { plain: ['id', 'record_key', 'kind', 'record_version', 'status', 'confirmed_at'], sealed: ['body_enc'] },
+  complaint_cases: { plain: ['id', 'contact_id', 'category', 'status', 'opened_at', 'respond_by', 'resolved_at', 'root_cause'] },
+  lead_sources: { plain: ['key', 'tier', 'type', 'lawful_basis', 'acquired_from'] },
+  data_imports: { plain: ['kind', 'lawful_basis', 'acquired_from', 'rows_imported', 'imported_at'] },
+};
+
+/** F20: every exported sealed column is declared; every exported table is in the registry. */
+export function tenantExportIsDeclared(): string[] {
+  const problems: string[] = [];
+  for (const [table, spec] of Object.entries(TENANT_EXPORT)) {
+    const entry = ERASURE_REGISTRY[table];
+    if (!entry) { problems.push(`${table} is exported but not in the registry`); continue; }
+    for (const c of spec.sealed ?? []) if (!entry.columns[c]) problems.push(`${table}.${c} is exported but not declared`);
+  }
+  return problems;
 }

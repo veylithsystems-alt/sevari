@@ -30,7 +30,8 @@ import { releaseHold, RELEASE_HOLD_JOB } from './bookings.ts';
 import { journeyConsumers, runEffect, runTimer, type Lifecycles } from './journey.ts';
 import { onboardingConsumers, type CellLive } from '@sevari/onboarding';
 import type { PaymentProcessor } from '@sevari/finance';
-import { BILLING_DUNNING_JOB, BILLING_RUN_JOB, BILLING_SUSPEND_JOB, billingRunHandler, dunningCheck, suspendHandler } from './billing.ts';
+import { BILLING_DUNNING_JOB, BILLING_RUN_JOB, BILLING_SUSPEND_JOB, billingRunHandler, dunningCheck, FINAL_BILL_JOB, finalBillHandler, suspendHandler } from './billing.ts';
+import { offloadConsumers } from './offload.ts';
 import { COMPLAINT_CLOCK_JOB, complaintClock, complaintConsumers } from './complaints.ts';
 import { chaseInvoice, INVOICE_CHASE_JOB, INVOICE_PREPARE_JOB, invoicePrepareHandler, invoicingConsumers } from './invoicing.ts';
 import { respond } from './respond.ts';
@@ -62,6 +63,7 @@ export function workerHandlers(deps: WorkerDeps): { handlers: Record<string, Job
   const consumers = makeConsumers({ keyring: deps.keyring, clock: deps.clock, ...lc, ...(deps.publicBaseUrl ? { publicBaseUrl: deps.publicBaseUrl } : {}) });
   Object.assign(consumers, journeyConsumers({ keyring: deps.keyring, clock: deps.clock, ...lc }));
   Object.assign(consumers, invoicingConsumers());
+  Object.assign(consumers, offloadConsumers({ keyring: deps.keyring }));
   Object.assign(consumers, complaintConsumers({ keyring: deps.keyring, clock: deps.clock, consumers, ...lc }));
   Object.assign(consumers, onboardingConsumers({ keyring: deps.keyring, clock: deps.clock, ...(deps.cellLive ? { cellLive: deps.cellLive } : {}) }));
   const hitl = { keyring: deps.keyring, clock: deps.clock, consumers, ...lc };
@@ -109,6 +111,7 @@ export function workerHandlers(deps: WorkerDeps): { handlers: Record<string, Job
     [BILLING_RUN_JOB]: billingRunHandler({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers, ...(deps.payments ? { payments: deps.payments } : {}) }),
     [BILLING_DUNNING_JOB]: (tx, p) => dunningCheck({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers }, tx, p),
     [BILLING_SUSPEND_JOB]: suspendHandler({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers }),
+    [FINAL_BILL_JOB]: finalBillHandler({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers }),
     [WEEKLY_REPORT_JOB]: async (tx, p) => {
       // Never report a week that hasn't finished, whatever the queue's timing says.
       if (deps.clock.nowMs() < Number(p['period_end'])) throw new Error('week not finished yet');

@@ -7,6 +7,7 @@ import type { ChannelId } from '@sevari/channels';
 import { findEndpoint } from '@sevari/db';
 import { receiveInbound, type IntakeDeps } from '@sevari/intake';
 import { registerOnboardingRoutes } from './onboarding.ts';
+import { registerPortalRoutes } from './portal.ts';
 import { registerOwnerRoutes, type OwnerDeps } from './owner.ts';
 import type { CellLive } from '@sevari/onboarding';
 import type { RateLimiter } from './rate-limit.ts';
@@ -92,6 +93,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   if (deps.owner) {
     registerOwnerRoutes(app, deps.owner);
     registerOnboardingRoutes(app, deps.owner);
+    registerPortalRoutes(app, deps.owner);
   }
   return app;
 }

@@ -78,3 +78,25 @@ export async function findOperator(db: Db, prefix: string): Promise<{ id: string
     return r ? { id: r.id, tokenHash: r.token_hash, role: r.role } : null;
   });
 }
+
+export interface PortalRoute { readonly id: string; readonly tenantId: TenantId; readonly region: RegionCode; readonly contactId: string; readonly tokenHash: Buffer; readonly expiresAt: Date }
+
+/** A customer's portal link, found by its prefix before the business is known (§22). */
+export async function findPortalToken(db: Db, prefix: string): Promise<PortalRoute | null> {
+  if (!/^pl_[a-z0-9]{12}$/.test(prefix)) return null;
+  return db.transaction().execute(async (trx) => {
+    await sql`SELECT set_config('app.portal_prefix', ${prefix}, true)`.execute(trx);
+    const r = await trx.selectFrom('portal_tokens').select(['id', 'tenant_id', 'region', 'contact_id', 'token_hash', 'expires_at']).where('prefix', '=', prefix).executeTakeFirst();
+    return r ? { id: r.id, tenantId: tenantId(r.tenant_id), region: regionCode(r.region), contactId: r.contact_id, tokenHash: r.token_hash, expiresAt: r.expires_at } : null;
+  });
+}
+
+/** Veylith's own account (the house tenant) in a region, for jobs that cross into it by design (final billing, §21.1). */
+export async function findHouseTenant(db: Db, region: string): Promise<{ tenantId: TenantId; region: RegionCode } | null> {
+  if (!/^[a-z][a-z0-9]{1,7}$/.test(region)) return null;
+  return db.transaction().execute(async (trx) => {
+    await sql`SELECT set_config('app.house_region', ${region}, true)`.execute(trx);
+    const r = await trx.selectFrom('tenants').select(['id', 'region']).where('is_house', '=', true).where('region', '=', region).executeTakeFirst();
+    return r ? { tenantId: tenantId(r.id), region: regionCode(r.region) } : null;
+  });
+}
