@@ -330,7 +330,7 @@ export interface AutonomyGrantsTable extends Meta, Tenant {
   revoked_at: Date | null;
   revoke_reason: string | null;
 }
-export type QuestionKind = 'approve_draft' | 'clarify_edit' | 'owner_task' | 'autonomy_grant' | 'knowledge_update' | 'dsar_release' | 'lifecycle_step' | 'go_live' | 'pack_confirm' | 'complaint';
+export type QuestionKind = 'approve_draft' | 'clarify_edit' | 'owner_task' | 'autonomy_grant' | 'knowledge_update' | 'dsar_release' | 'lifecycle_step' | 'go_live' | 'pack_confirm' | 'complaint' | 'offload';
 export type SafeDefault = 'hold' | 'reask' | 'escalate' | 'fail_closed';
 export interface HumanQuestionsTable extends Meta, Tenant {
   kind: QuestionKind;
@@ -659,6 +659,17 @@ export interface ComplaintCasesTable extends Meta, Tenant {
   status: Generated<'open' | 'remedy_proposed' | 'resolved' | 'closed'>; assigned_user_id: string | null; opened_at: Date; respond_by: Date; breached_at: Date | null; resolved_at: Date | null;
   remedy: ColumnType<Record<string, unknown> | null, string | null | undefined, string | null>; root_cause: 'workmanship' | 'communication' | 'price' | 'timing' | 'damage' | 'no_fault' | 'other' | null; satisfaction_opt_in: boolean | null;
 }
+export interface PartnersTable extends Meta, Tenant { name: string; kind: 'subcontractor' | 'specialist' | 'partner_firm' | 'insurer' | 'regulator' | 'debt_recovery'; relationship: 'processor' | 'controller'; lawful_basis: string; dpa_ref: string | null; enabled: Generated<boolean>; recorded_by: string }
+export interface OffloadsTable extends Meta, Tenant {
+  case_ref: string; contact_id: string | null; partner_id: string | null; processor_id: string | null;
+  purpose: 'subcontract' | 'specialist' | 'partner_referral' | 'insurance' | 'regulator' | 'debt_recovery'; lawful_basis: string; fields: string[];
+  bundle_enc: Buffer | null; status: Generated<'awaiting_approval' | 'approved' | 'refused' | 'cancelled'>; owner_user_id: string; input_id: string | null;
+}
+export interface TenantOffboardingsTable extends Meta, Tenant {
+  reason: 'owner' | 'non_payment' | 'veylith'; requested_at: Date; notice_until: Date; grace_until: Date; status: Generated<'notice' | 'grace' | 'erased' | 'cancelled'>;
+  exported_at: Date | null; erasure_decision_id: string | null; certificate: ColumnType<Record<string, unknown> | null, string | null | undefined, string | null>; erased_at: Date | null;
+}
+export interface PortalTokensTable extends Meta, Tenant { contact_id: string; prefix: string; token_hash: Buffer; expires_at: Date; last_used_at: Date | null }
 type ViewOf<T> = { readonly [K in keyof T]: T[K] };
 export type MetricsEnquiryFlowView = ViewOf<{
   tenant_id: string; region: string; enquiry_id: string; received_at: Date; analysed_at: Date; route: string; intent: string; intent_source: string; abstained: boolean;
@@ -736,6 +747,10 @@ export interface Database {
   accounting_mappings: AccountingMappingsTable;
   accounting_sync_log: AccountingSyncLogTable;
   complaint_cases: ComplaintCasesTable;
+  partners: PartnersTable;
+  offloads: OffloadsTable;
+  tenant_offboardings: TenantOffboardingsTable;
+  portal_tokens: PortalTokensTable;
 }
 
 export type QuestionRow = Selectable<HumanQuestionsTable>;

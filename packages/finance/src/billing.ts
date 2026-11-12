@@ -53,16 +53,18 @@ export interface BillLine { readonly description: string; readonly quantity: num
 const days = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
 
 /** The lines for one period: the plan (or founding rate, or pilot), prorated for a part period, plus overage. */
-export function billLines(plan: Plan, terms: Terms, usage: Usage, periodStart: string, periodEnd: string): BillLine[] {
+export function billLines(plan: Plan, terms: Terms, usage: Usage, periodStart: string, periodEnd: string, stopOn?: string): BillLine[] {
+  // A final bill (§21.1) stops part-way through a period: charged for the days up to the stop date only.
+  const until = stopOn !== undefined && stopOn < periodEnd ? stopOn : periodEnd;
   if (terms.pilotUntil && periodEnd <= terms.pilotUntil) return [];
   const founding = terms.foundingPriceMinor !== null && terms.foundingLockUntil !== null && periodStart < terms.foundingLockUntil;
   const base = founding ? terms.foundingPriceMinor ?? plan.priceMinor : plan.priceMinor;
   const billedFrom = [terms.startedOn, terms.pilotUntil ?? '0000-01-01', periodStart].sort().at(-1) ?? periodStart;
   const total = days(periodStart, periodEnd);
-  const used = Math.max(0, days(billedFrom, periodEnd));
+  const used = Math.max(0, days(billedFrom, until));
   const lines: BillLine[] = [];
   const amount = used >= total ? base : Math.round((base * used) / total);
-  const label = `${plan.name} plan${founding ? ' (founding rate)' : ''}, ${periodStart} to ${periodEnd}${used < total ? ` (${used} of ${total} days)` : ''}`;
+  const label = `${plan.name} plan${founding ? ' (founding rate)' : ''}, ${periodStart} to ${until}${used < total ? ` (${used} of ${total} days)` : ''}`;
   if (amount > 0) lines.push({ description: label, quantity: 1, unitMinor: amount });
   const over = Math.max(0, usage.resolvedEnquiries - plan.allowances.enquiries);
   if (over > 0 && plan.overagePerEnquiryMinor > 0) lines.push({ description: `Enquiries beyond the ${plan.allowances.enquiries} included`, quantity: over, unitMinor: plan.overagePerEnquiryMinor });

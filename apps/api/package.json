@@ -19,6 +19,7 @@
     "@sevari/hitl": "workspace:*",
     "@sevari/identity": "workspace:*",
     "@sevari/intake": "workspace:*",
+    "@sevari/knowledge": "workspace:*",
     "@sevari/privacy": "workspace:*",
     "@sevari/finance": "workspace:*",
     "@sevari/onboarding": "workspace:*",

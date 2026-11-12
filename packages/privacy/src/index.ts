@@ -5,3 +5,6 @@ export * from './dsar.ts';
 export * from './retention.ts';
 export * from './shred-register.ts';
 export * from './keys.ts';
+export * from './offboarding.ts';
+export * from './offload.ts';
+export * from './portal.ts';

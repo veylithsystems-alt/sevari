@@ -11,7 +11,7 @@
 import { appendAudit } from '@sevari/audit';
 import type { Clock } from '@sevari/clock';
 import type { TenantKeyring } from '@sevari/crypto';
-import { enqueue, sql, withTenant, type Db, type TenantTx } from '@sevari/db';
+import { enqueue, findHouseTenant, sql, withTenant, type Db, type TenantTx } from '@sevari/db';
 import { ContractViolation, regionCode, tenantId, type TenantScope } from '@sevari/domain';
 import { billLines, draftInvoice, formatMoney, meterUsage, moneyPortFor, nextPeriod, planOn, type PaymentProcessor } from '@sevari/finance';
 import { notify, ownerOf, type ConsumerRegistry } from '@sevari/hitl';
@@ -20,6 +20,7 @@ import { askToSendInvoice } from './invoicing.ts';
 export const BILLING_RUN_JOB = 'billing.run';
 export const BILLING_DUNNING_JOB = 'billing.dunning';
 export const BILLING_SUSPEND_JOB = 'billing.suspend';
+export const FINAL_BILL_JOB = 'offboarding.final_bill';
 /** Days after the due date before a subscription is past due, and the notice before any suspension. */
 export const GRACE_DAYS = 14;
 export const NOTICE_DAYS = 7;
@@ -62,9 +63,12 @@ export function billingRunHandler(deps: BillingDeps) {
         .select([sql<string>`period_start::text`.as('ps'), sql<string>`period_end::text`.as('pe'), sql<string>`started_on::text`.as('so'), sql<string | null>`pilot_until::text`.as('pu'), sql<string | null>`founding_lock_until::text`.as('fl')])
         .where('id', '=', subId).executeTakeFirst());
       if (!sub || sub.status === 'cancelled' || sub.status === 'suspended') return 'not_billable';
-      if (sub.pe > today) throw new Error('billing period not finished yet');
+      // A final bill (§21.1) stops at the end of the business's notice period, part-way through a period.
+      const finalOn = typeof p['final_on'] === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p['final_on']) ? p['final_on'] : null;
+      const end = finalOn !== null && finalOn < sub.pe ? finalOn : sub.pe;
+      if (end > today) throw new Error('billing period not finished yet');
       // Counters only, read in the business's own scope (§19.4: billing never reads message content).
-      const usage = await meterUsage(deps.db, { tenantId: tenantId(sub.business_tenant_id), region: regionCode(house.region) }, sub.ps, sub.pe);
+      const usage = await meterUsage(deps.db, { tenantId: tenantId(sub.business_tenant_id), region: regionCode(house.region) }, sub.ps, end);
       const drafted = await withTenant(deps.db, house, async (tx) => {
         const plan = await planOn(tx, sub.plan_key, sub.ps);
         if (!plan) {
@@ -72,21 +76,27 @@ export function billingRunHandler(deps: BillingDeps) {
           if (owner) await notify(tx, deps.keyring, { userId: owner, kind: 'warning', ref: `subscription:${subId}`, dedupeKey: `noplan:${subId}:${sub.ps}`, text: `No approved price for the "${sub.plan_key}" plan on ${sub.ps}, so nothing was billed. Approve the plan's prices first.` });
           return null;
         }
-        const run = await tx.insertInto('billing_runs').values({ tenant_id: house.tenantId, region: house.region, subscription_id: subId, period_start: sub.ps, period_end: sub.pe, usage: JSON.stringify(usage) })
+        const run = await tx.insertInto('billing_runs').values({ tenant_id: house.tenantId, region: house.region, subscription_id: subId, period_start: sub.ps, period_end: end, usage: JSON.stringify(usage) })
           .onConflict((oc) => oc.columns(['tenant_id', 'subscription_id', 'period_start']).doNothing()).returning('id').executeTakeFirst();
-        if (!run) return 'already' as const;
-        const lines = billLines(plan, { startedOn: sub.so, pilotUntil: sub.pu, foundingPriceMinor: sub.founding_price_minor === null ? null : Number(sub.founding_price_minor), foundingLockUntil: sub.fl }, usage, sub.ps, sub.pe);
-        const next = nextPeriod(sub.pe);
-        await tx.updateTable('subscriptions').set({ period_start: next.start, period_end: next.end, ...(sub.status === 'pilot' && sub.pu && next.start >= sub.pu ? { status: 'active' } : {}) }).where('id', '=', subId).execute();
-        await enqueue(tx, { kind: BILLING_RUN_JOB, dedupeKey: `bill:${subId}:${next.end}`, runAt: at9(next.end), payload: { subscription_id: subId } });
-        if (!lines.length) return 'nothing_to_bill' as const;
+        if (!run && finalOn === null) return 'already' as const;
+        const lines = run ? billLines(plan, { startedOn: sub.so, pilotUntil: sub.pu, foundingPriceMinor: sub.founding_price_minor === null ? null : Number(sub.founding_price_minor), foundingLockUntil: sub.fl }, usage, sub.ps, sub.pe, end) : [];
+        if (finalOn !== null) {
+          // The last bill: the subscription ends here, and no further period is scheduled.
+          await tx.updateTable('subscriptions').set({ status: 'cancelled' }).where('id', '=', subId).execute();
+          await appendAudit(tx, { type: 'subscription.ended', actor: { kind: 'system' }, subject: `subscription:${subId}`, payload: { ended_on: end, reason: 'offboarding' } });
+        } else {
+          const next = nextPeriod(sub.pe);
+          await tx.updateTable('subscriptions').set({ period_start: next.start, period_end: next.end, ...(sub.status === 'pilot' && sub.pu && next.start >= sub.pu ? { status: 'active' } : {}) }).where('id', '=', subId).execute();
+          await enqueue(tx, { kind: BILLING_RUN_JOB, dedupeKey: `bill:${subId}:${next.end}`, runAt: at9(next.end), payload: { subscription_id: subId } });
+        }
+        if (!run || !lines.length) return 'nothing_to_bill' as const;
         const inv = await draftInvoice(tx, { contactId: sub.contact_id, vatTreatment: plan.vatTreatment, lines: lines.map((l) => ({ ...l, sourceRef: `subscription:${subId}` })), factsUsed: [`plan:${plan.planKey}@${plan.planVersion}`] });
         await tx.updateTable('billing_runs').set({ invoice_id: inv.id }).where('id', '=', run.id).execute();
         const msg = await tx.selectFrom('messages').innerJoin('conversations', 'conversations.id', 'messages.conversation_id').select('messages.id')
           .where('conversations.contact_id', '=', sub.contact_id).where('messages.direction', '=', 'inbound').orderBy('messages.received_at', 'desc').executeTakeFirst();
         if (!msg) throw new ContractViolation('§19.4', 'no way to reach this business for its invoice');
-        await enqueue(tx, { kind: BILLING_DUNNING_JOB, dedupeKey: `dun:${subId}:${sub.pe}`, runAt: at9(day(Date.parse(`${sub.pe}T00:00:00Z`) + (GRACE_DAYS + 14) * 86_400_000)), payload: { subscription_id: subId } });
-        return { invoiceId: inv.id, total: inv.total, currency: inv.currency, service: `your Sevari ${plan.name} plan (${sub.ps} to ${sub.pe})`, vat: plan.vatTreatment, messageId: msg.id };
+        await enqueue(tx, { kind: BILLING_DUNNING_JOB, dedupeKey: `dun:${subId}:${end}`, runAt: at9(day(Date.parse(`${end}T00:00:00Z`) + (GRACE_DAYS + 14) * 86_400_000)), payload: { subscription_id: subId } });
+        return { invoiceId: inv.id, total: inv.total, currency: inv.currency, service: `your Sevari ${plan.name} plan (${sub.ps} to ${end})${finalOn !== null ? ', final bill' : ''}`, vat: plan.vatTreatment, messageId: msg.id };
       });
       if (!drafted || typeof drafted === 'string') return drafted ?? 'no_plan';
       let link: { providerLinkId: string; url: string; provider: string } | null = null;
@@ -146,6 +156,28 @@ export function suspendHandler(deps: BillingDeps) {
       });
       await withTenant(deps.db, house, (tx) => tx.updateTable('subscriptions').set({ status: 'suspended' }).where('id', '=', subId).execute());
       return 'suspended';
+    },
+  };
+}
+
+/**
+ * At the end of a business's notice period (§21.1): unless they changed their mind, their Sevari subscription
+ * gets its final bill, for the days used, and ends. Runs in the business's scope; the bill is Veylith's record.
+ */
+export function finalBillHandler(deps: BillingDeps) {
+  return {
+    scoped: async (business: TenantScope, p: Record<string, unknown>) => {
+      const ob = await withTenant(deps.db, business, (tx) => tx.selectFrom('tenant_offboardings').select(['id', 'status', sql<string>`notice_until::date::text`.as('end_on')])
+        .where('id', '=', String(p['offboarding_id'])).executeTakeFirst());
+      if (!ob || ob.status === 'cancelled') return 'offboarding_cancelled';
+      const house = await findHouseTenant(deps.db, business.region);
+      if (!house) return 'no_house_account';
+      return withTenant(deps.db, house, async (tx) => {
+        const sub = await tx.selectFrom('subscriptions').select('id').where('business_tenant_id', '=', business.tenantId).where('status', '<>', 'cancelled').executeTakeFirst();
+        if (!sub) return 'no_subscription';
+        await enqueue(tx, { kind: BILLING_RUN_JOB, dedupeKey: `bill:${sub.id}:final`, runAt: deps.clock.now(), payload: { subscription_id: sub.id, final_on: ob.end_on } });
+        return 'final_bill_scheduled';
+      });
     },
   };
 }

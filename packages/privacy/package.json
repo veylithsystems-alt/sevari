@@ -9,6 +9,7 @@
     "@sevari/clock": "workspace:*",
     "@sevari/crypto": "workspace:*",
     "@sevari/db": "workspace:*",
-    "@sevari/domain": "workspace:*"
+    "@sevari/domain": "workspace:*",
+    "@sevari/outbound": "workspace:*"
   }
 }
