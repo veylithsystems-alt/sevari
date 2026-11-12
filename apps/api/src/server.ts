@@ -5,8 +5,8 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
-import type { ChannelId } from '@sevari/channels';
-import { findEndpoint } from '@sevari/db';
+import { BrevoInboundBatch, BrevoInboundItem, deliveredTo, isFromBrevo, type ChannelId } from '@sevari/channels';
+import { findEndpoint, findEndpointByAddress } from '@sevari/db';
 import { receiveInbound, type IntakeDeps } from '@sevari/intake';
 import { registerAccountRoutes, type SignupTerms } from './accounts.ts';
 import { registerOnboardingRoutes } from './onboarding.ts';
@@ -24,6 +24,11 @@ export interface ServerDeps {
   readonly logger?: boolean;
   /** Owner app API (Phase 6/18). Omitted on intake-only nodes. */
   readonly owner?: OwnerDeps & { readonly cellLive?: CellLive };
+  /**
+   * Email received through Brevo (inbound parsing): the bearer token given to Brevo's webhook and the
+   * cell's receiving domain. Both come from the secrets store and config; absent means no email channel.
+   */
+  readonly brevoInbound?: { readonly token: string; readonly domain: string };
   /** Sign-up and sign-in (§81, R-13). `region` is the cell's region; `signup` absent keeps sign-up closed. */
   readonly accounts?: { readonly region: string; readonly signup?: SignupTerms };
 }
@@ -70,6 +75,38 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       .header('access-control-max-age', '600').send();
   });
 
+  // Email received through Brevo: one batch for the whole receiving domain. Each email goes to intake on
+  // its own, for the business whose receiving address it was sent to. Authentic but unroutable emails are
+  // acknowledged and dropped (Brevo would otherwise retry them); a failure to store one asks Brevo to retry.
+  app.post('/v1/inbound/brevo/email', async (req, reply) => {
+    const cfg = deps.brevoInbound;
+    const headers: Record<string, string | undefined> = {};
+    for (const [k, v] of Object.entries(req.headers)) headers[k.toLowerCase()] = Array.isArray(v) ? v.join(',') : v;
+    if (!cfg || !isFromBrevo(headers, cfg.token)) return reply.code(401).send({ error: 'not from Brevo' });
+    if (!deps.limiter.take('brevo-inbound')) return reply.code(429).header('retry-after', '60').send({ error: 'rate limited' });
+    let batch: unknown;
+    try { batch = JSON.parse(Buffer.isBuffer(req.body) ? req.body.toString('utf8') : '{}'); } catch { return reply.code(400).send({ error: 'body is not JSON' }); }
+    const b = BrevoInboundBatch.safeParse(batch);
+    if (!b.success) return reply.code(400).send({ error: 'not a Brevo inbound batch' });
+    const counts = { accepted: 0, dropped: 0, unrouted: 0, rejected: 0 };
+    for (const raw of b.data.items) {
+      const item = BrevoInboundItem.safeParse(raw);
+      if (!item.success) { counts.rejected += 1; continue; }
+      const domain = `@${cfg.domain.toLowerCase()}`;
+      let endpoint: { publicId: string } | null = null;
+      for (const to of deliveredTo(item.data).filter((a) => a.endsWith(domain))) {
+        endpoint = await findEndpointByAddress(deps.intake.db, to);
+        if (endpoint) break;
+      }
+      if (!endpoint) { counts.unrouted += 1; continue; }
+      const r = await receiveInbound(deps.intake, { channel: 'email', publicId: endpoint.publicId, raw: { body: Buffer.from(JSON.stringify(item.data)), headers, url: deps.publicBaseUrl + req.url } });
+      if (r.status === 'accepted') counts.accepted += 1;
+      else if (r.status === 'dropped') counts.dropped += 1;
+      else counts.rejected += 1;
+    }
+    return reply.send(counts);
+  });
+
   app.post<{ Params: { channel: string; publicId: string } }>('/v1/inbound/:channel/:publicId', async (req, reply) => {
     const { channel, publicId } = req.params;
     if (!CHANNELS.has(channel)) return reply.code(404).send({ error: 'unknown endpoint' });
@@ -100,7 +137,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
   if (deps.owner) {
     registerOwnerRoutes(app, deps.owner);
-    registerOnboardingRoutes(app, { ...deps.owner, publicBaseUrl: deps.publicBaseUrl });
+    registerOnboardingRoutes(app, { ...deps.owner, publicBaseUrl: deps.publicBaseUrl, ...(deps.brevoInbound ? { inboundEmailDomain: deps.brevoInbound.domain } : {}) });
     registerPortalRoutes(app, deps.owner);
     if (deps.accounts) registerAccountRoutes(app, { db: deps.owner.db, keyring: deps.owner.keyring, clock: deps.owner.clock, publicBaseUrl: deps.publicBaseUrl, region: deps.accounts.region, limiter: deps.limiter, ...(deps.accounts.signup ? { signup: deps.accounts.signup } : {}) });
   }

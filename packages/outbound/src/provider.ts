@@ -10,6 +10,8 @@ export interface OutboundEnvelope {
   readonly to: string;
   readonly subject?: string;
   readonly text: string;
+  /** Where the customer's reply should go: the business's own receiving address, so it comes back to Sevari. */
+  readonly replyTo?: string;
 }
 
 export type SendOutcome =

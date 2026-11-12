@@ -100,3 +100,14 @@ export async function findHouseTenant(db: Db, region: string): Promise<{ tenantI
     return r ? { tenantId: tenantId(r.id), region: regionCode(r.region) } : null;
   });
 }
+
+/** The email channel a receiving address belongs to (inbound email through Brevo), before the business is known. */
+export async function findEndpointByAddress(db: Db, address: string): Promise<{ publicId: string } | null> {
+  const a = address.trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9-]{2,62}@[a-z0-9][a-z0-9.-]{1,200}$/.test(a)) return null;
+  return db.transaction().execute(async (trx) => {
+    await sql`SELECT set_config('app.inbound_address', ${a}, true)`.execute(trx);
+    const r = await trx.selectFrom('channel_endpoints').select(['public_id', 'channel', 'status']).where('inbound_address', '=', a).executeTakeFirst();
+    return r && r.channel === 'email' && r.status === 'active' ? { publicId: r.public_id } : null;
+  });
+}

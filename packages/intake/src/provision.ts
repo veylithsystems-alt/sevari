@@ -15,6 +15,8 @@ export interface NewEndpoint {
   readonly allowedOrigins?: readonly string[];
   /** Webform endpoints are public and unsigned; every other channel gets an HMAC secret. */
   readonly withSecret?: boolean;
+  /** Email received through Brevo: the channel's own receiving address. */
+  readonly inboundAddress?: string;
 }
 
 export async function createEndpoint(tx: TenantTx, keyring: TenantKeyring, spec: NewEndpoint, actorRef: string):
@@ -25,6 +27,7 @@ export async function createEndpoint(tx: TenantTx, keyring: TenantKeyring, spec:
   const row = await tx.insertInto('channel_endpoints').values({
     tenant_id: tx.scope.tenantId, region: tx.scope.region, channel: spec.channel, public_id: publicId,
     lawful_basis: spec.lawfulBasis, purpose: spec.purpose, allowed_origins: [...(spec.allowedOrigins ?? [])],
+    ...(spec.inboundAddress ? { inbound_address: spec.inboundAddress.toLowerCase() } : {}),
   }).returning('id').executeTakeFirstOrThrow();
   if (secret) {
     const sealed = await keyring.seal(tx, { table: 'channel_endpoints', column: 'secret_enc', rowId: row.id }, secret);

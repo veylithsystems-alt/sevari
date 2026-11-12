@@ -98,3 +98,5 @@ Cross-business suppression (DEV-018) is a known gap with a plan: it is built bef
 | I-43 | Owners can type "mysite.co.uk"; Sevari adds the secure https themselves rather than refusing the address | Built, tested (browser) |
 | I-44 | The brief's email says only how many things need the owner, never what they are, so no customer detail travels by email; the brief itself stays in the app | Built, tested |
 | I-45 | Briefs start the moment a business goes live, and the 7am/7pm times follow the business's own clock changes | Built, tested |
+| I-46 | Emails are never answered if they're automatic (out-of-office, bounces, mailing lists, no-reply senders) or spam, so two machines can't email each other forever | Built, tested |
+| I-47 | Sevari's emails carry the business's own receiving address as Reply-To, so customers' answers return to the same conversation | Built, tested (off until Q-27) |

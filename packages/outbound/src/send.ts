@@ -131,7 +131,12 @@ export async function dispatch(deps: DispatchDeps, scope: TenantScope, outboxId:
       .where('id', '=', outboxId).execute();
     const to = await deps.keyring.openText(tx, field('recipient_enc', outboxId), row.recipient_enc);
     const text = await deps.keyring.openText(tx, field('body_enc', outboxId), row.body_enc);
-    return { kind: 'send' as const, env: { reference: outboxId, channel: row.channel as 'email' | 'sms', to, text } };
+    // An email answer goes out with the business's receiving address as reply-to, so the customer's reply returns here.
+    const via = row.channel === 'email' && row.in_reply_to
+      ? await tx.selectFrom('messages').innerJoin('channel_endpoints', 'channel_endpoints.id', 'messages.endpoint_id').select('channel_endpoints.inbound_address')
+        .where('messages.id', '=', row.in_reply_to).executeTakeFirst()
+      : undefined;
+    return { kind: 'send' as const, env: { reference: outboxId, channel: row.channel as 'email' | 'sms', to, text, ...(via?.inbound_address ? { replyTo: via.inbound_address } : {}) } };
   });
   if (claim.kind === 'done') return claim.result;
 

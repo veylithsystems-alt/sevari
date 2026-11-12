@@ -11,6 +11,7 @@
  *   GET  /v1/owner/channels              the business's channels and whether each has been tested
  *   POST /v1/owner/channels              a website enquiry form, with the code to paste into their site
  */
+import { randomBytes } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { appendAudit } from '@sevari/audit';
@@ -30,7 +31,10 @@ const ImportBody = z.object({
   acquired_from: z.string().max(300),
 }).strict();
 const ChannelBody = z.object({ endpoint_public_id: z.string().min(8).max(80) }).strict();
-const NewForm = z.object({ channel: z.literal('webform'), site: z.string().url().max(200) }).strict();
+const NewChannel = z.discriminatedUnion('channel', [
+  z.object({ channel: z.literal('webform'), site: z.string().url().max(200) }).strict(),
+  z.object({ channel: z.literal('email') }).strict(),
+]);
 /** Replying to an enquiry the person sent is a step they asked for before any contract (UK GDPR Art 6(1)(b)). */
 const ENQUIRY_BASIS = 'steps at the request of the person before a contract: replying to the enquiry they sent';
 const escapeAttr = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -40,7 +44,7 @@ const json = (req: FastifyRequest): unknown => {
   try { return JSON.parse(Buffer.isBuffer(req.body) ? req.body.toString('utf8') : '{}'); } catch { return null; }
 };
 
-export function registerOnboardingRoutes(app: FastifyInstance, deps: OwnerDeps & { readonly cellLive?: CellLive; readonly publicBaseUrl?: string }): void {
+export function registerOnboardingRoutes(app: FastifyInstance, deps: OwnerDeps & { readonly cellLive?: CellLive; readonly publicBaseUrl?: string; readonly inboundEmailDomain?: string }): void {
   const cellLive = deps.cellLive ?? NOT_CLEARED;
   const ownerOnly = async (req: FastifyRequest, reply: FastifyReply): Promise<Extract<Credential, { kind: 'user' }> | null> => {
     const cred = await authenticate(deps.db, deps.clock, bearer(req));
@@ -118,15 +122,27 @@ export function registerOnboardingRoutes(app: FastifyInstance, deps: OwnerDeps &
   app.get('/v1/owner/channels', async (req, reply) => {
     const cred = await ownerOnly(req, reply);
     if (!cred) return reply;
-    const rows = await withTenant(deps.db, cred.scope, (tx) => tx.selectFrom('channel_endpoints').select(['public_id', 'channel', 'status', 'verified_at', 'allowed_origins']).orderBy('created_at').execute());
-    return { channels: rows.map((r) => ({ id: r.public_id, channel: r.channel, active: r.status === 'active', tested: r.verified_at !== null, sites: r.allowed_origins })) };
+    const rows = await withTenant(deps.db, cred.scope, (tx) => tx.selectFrom('channel_endpoints').select(['public_id', 'channel', 'status', 'verified_at', 'allowed_origins', 'inbound_address']).orderBy('created_at').execute());
+    return { channels: rows.map((r) => ({ id: r.public_id, channel: r.channel, active: r.status === 'active', tested: r.verified_at !== null, sites: r.allowed_origins, address: r.inbound_address })) };
   });
 
   app.post('/v1/owner/channels', async (req, reply) => {
     const cred = await ownerOnly(req, reply);
     if (!cred) return reply;
-    const body = NewForm.safeParse(json(req));
+    const body = NewChannel.safeParse(json(req));
     if (!body.success) return reply.code(400).send({ error: 'Please give your website address, starting https://' });
+    if (body.data.channel === 'email') {
+      const domain = deps.inboundEmailDomain;
+      if (!domain) return reply.code(503).send({ error: 'Receiving enquiries by email isn\'t switched on here yet.' });
+      const r = await withTenant(deps.db, cred.scope, async (tx) => {
+        const t = await tx.selectFrom('tenants').select('display_name').where('id', '=', cred.scope.tenantId).executeTakeFirstOrThrow();
+        const slug = t.display_name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30) || 'enquiries';
+        const address = `${slug}-${randomBytes(6).toString('hex').slice(0, 6)}@${domain.toLowerCase()}`;
+        const ep = await createEndpoint(tx, deps.keyring, { channel: 'email', lawfulBasis: ENQUIRY_BASIS, purpose: 'enquiries', inboundAddress: address }, `user:${cred.userId}`);
+        return { id: ep.publicId, address };
+      });
+      return reply.code(201).send({ ...r, instructions: `Customers can email ${r.address}. You can also forward your business email to it, or put it on your website.` });
+    }
     const origin = new URL(body.data.site).origin;
     if (!origin.startsWith('https://')) return reply.code(400).send({ error: 'Your website needs to use https:// so enquiries are sent securely.' });
     const ep = await withTenant(deps.db, cred.scope, (tx) => createEndpoint(tx, deps.keyring, { channel: 'webform', lawfulBasis: ENQUIRY_BASIS, purpose: 'enquiries', allowedOrigins: [origin] }, `user:${cred.userId}`));

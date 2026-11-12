@@ -269,7 +269,19 @@ $('#channel-form').addEventListener('submit', async (e) => {
   lastChannel = b.id;
   $('#snippet').value = b.snippet;
   $('#snippet-box').hidden = false;
+  $('#test-box').hidden = false;
   say('Your enquiry form is ready. Copy it into your website, then send a test message.');
+  await loadChannels();
+});
+$('#email-channel').addEventListener('click', async () => {
+  const res = await post('/v1/owner/channels', { channel: 'email' });
+  const b = await bodyOf(res);
+  if (!res.ok) { say(b.error ?? 'Something went wrong.'); return; }
+  lastChannel = b.id;
+  $('#email-address').hidden = false;
+  $('#email-address').textContent = b.instructions;
+  $('#test-box').hidden = false;
+  say('Your Sevari email address is ready. Send a test message to check it.');
   await loadChannels();
 });
 $('#copy-snippet').addEventListener('click', async () => {
@@ -288,7 +300,7 @@ async function loadChannels() {
   const names = { webform: 'Website form', email: 'Email', sms: 'Text messages', api: 'Connected system' };
   $('#channel-list').replaceChildren(...(b.channels ?? []).map((c) => {
     const li = document.createElement('li');
-    li.textContent = `${names[c.channel] ?? c.channel}${c.sites?.length ? ` on ${c.sites.join(', ')}` : ''}: ${c.tested ? 'tested ✓' : 'not tested yet'}`;
+    li.textContent = `${names[c.channel] ?? c.channel}${c.sites?.length ? ` on ${c.sites.join(', ')}` : ''}${c.address ? ` (${c.address})` : ''}: ${c.tested ? 'tested ✓' : 'not tested yet'}`;
     return li;
   }));
   if ((b.channels ?? []).some((c) => c.tested)) { step(4); await loadChecklist(); }

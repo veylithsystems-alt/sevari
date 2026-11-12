@@ -123,6 +123,7 @@ export interface ChannelEndpointsTable extends Meta {
   status: Generated<'active' | 'disabled'>;
   check_code_hash: Buffer | null;
   verified_at: Date | null;
+  inbound_address: Generated<string | null>;
 }
 export interface ApiKeysTable extends Meta {
   id: Generated<string>;

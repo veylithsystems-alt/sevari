@@ -133,7 +133,13 @@
         <div id="snippet-box" hidden>
           <label for="snippet">Copy this into your website, where the form should appear</label>
           <textarea id="snippet" rows="8" readonly></textarea>
-          <div class="row"><button type="button" id="copy-snippet" class="ghost">Copy</button><button type="button" id="test-channel">Send a test message</button></div>
+          <div class="row"><button type="button" id="copy-snippet" class="ghost">Copy</button></div>
+        </div>
+        <p class="muted">Or take enquiries by email as well:</p>
+        <button type="button" class="ghost" id="email-channel">Give me a Sevari email address</button>
+        <p id="email-address" class="callout" hidden></p>
+        <div id="test-box" hidden>
+          <button type="button" id="test-channel">Send a test message</button>
           <p id="test-code" class="callout" hidden></p>
         </div>
         <ul id="channel-list" class="list"></ul>

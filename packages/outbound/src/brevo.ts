@@ -48,7 +48,7 @@ export class BrevoProvider implements OutboundProvider {
     const body = JSON.stringify({
       sender: this.#cfg.sender,
       to: [{ email: env.to }],
-      ...(this.#cfg.replyTo ? { replyTo: { email: this.#cfg.replyTo } } : {}),
+      ...((env.replyTo ?? this.#cfg.replyTo) ? { replyTo: { email: env.replyTo ?? this.#cfg.replyTo } } : {}),
       subject: env.subject ?? `Your enquiry with ${this.#cfg.sender.name}`,
       textContent: env.text,
       headers: { 'X-Sevari-Ref': env.reference },
