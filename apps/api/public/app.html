@@ -4,27 +4,50 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0f3d3e">
-  <title>Sevari inbox</title>
+  <title>Sevari</title>
   <link rel="manifest" href="/app/manifest.webmanifest">
   <link rel="icon" href="/app/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/app/app.css">
 </head>
 <body>
+  <a class="skip" href="#main">Skip to content</a>
   <header class="top">
-    <h1>Sevari</h1>
-    <button id="refresh" class="ghost" type="button" hidden>Refresh</button>
+    <h1>Sevari <span id="business" class="biz"></span></h1>
+    <nav id="nav" aria-label="Main" hidden>
+      <button type="button" class="ghost" data-go="inbox">Inbox</button>
+      <button type="button" class="ghost" data-go="setup" id="nav-setup" hidden>Set up</button>
+      <button type="button" class="ghost" id="signout">Sign out</button>
+    </nav>
   </header>
   <main id="main" tabindex="-1">
     <p id="status" role="status" aria-live="polite" class="status"></p>
-    <section id="signin" class="card" hidden>
-      <h2>Sign in</h2>
-      <p>Paste the sign-in key from your welcome message. It stays on this device only until you close the app.</p>
-      <form id="signin-form">
-        <label for="token">Sign-in key</label>
-        <input id="token" name="token" autocomplete="off" spellcheck="false" required>
-        <button type="submit">Sign in</button>
-      </form>
+
+    <section id="welcome" hidden>
+      <div class="card">
+        <h2>Sign in</h2>
+        <p class="muted">We'll email you a link. It works once, for 15 minutes. No password needed.</p>
+        <form id="signin-form">
+          <label for="signin-email">Email address</label>
+          <input id="signin-email" type="email" autocomplete="email" required>
+          <button type="submit">Email me a sign-in link</button>
+        </form>
+      </div>
+      <div class="card" id="signup-card">
+        <h2>New to Sevari?</h2>
+        <p id="signup-closed" class="muted" hidden>Sign-ups open soon.</p>
+        <form id="signup-form" hidden>
+          <label for="su-name">Your name</label>
+          <input id="su-name" autocomplete="name" required maxlength="120">
+          <label for="su-business">Your business name</label>
+          <input id="su-business" autocomplete="organization" required maxlength="160">
+          <label for="su-email">Email address</label>
+          <input id="su-email" type="email" autocomplete="email" required>
+          <p class="check"><input id="su-terms" type="checkbox" required> <label for="su-terms" class="inline">I agree to the <a id="su-terms-link" target="_blank" rel="noopener">terms</a> and have read the <a id="su-privacy-link" target="_blank" rel="noopener">privacy notice</a>.</label></p>
+          <button type="submit">Start setting up</button>
+        </form>
+      </div>
     </section>
+
     <section id="inbox" hidden>
       <h2 id="waiting-heading">Waiting for you</h2>
       <p id="empty" class="muted" hidden>Nothing needs you right now. Every customer has been acknowledged.</p>
@@ -32,7 +55,94 @@
       <h2 id="updates-heading">Updates</h2>
       <ol id="notes" class="list notes" aria-labelledby="updates-heading"></ol>
     </section>
+
+    <section id="setup" hidden>
+      <h2>Set up your business</h2>
+      <p class="muted">About ten minutes. Nothing is sent to your customers until you go live, and you check everything first.</p>
+      <ol class="steps" aria-label="Steps">
+        <li id="step-1-label">Your details</li><li id="step-2-label">Check and confirm</li><li id="step-3-label">Connect your website</li><li id="step-4-label">Go live</li>
+      </ol>
+
+      <form id="setup-form" class="card" novalidate>
+        <fieldset>
+          <legend>Your business</legend>
+          <label for="b-name">Trading name</label>
+          <input id="b-name" required maxlength="120">
+          <label for="b-desc">What you do, in your own words</label>
+          <textarea id="b-desc" rows="3" required maxlength="1000" placeholder="e.g. Drain unblocking and CCTV surveys for homes in Chester"></textarea>
+          <label for="b-reply">Your reply-time promise</label>
+          <select id="b-reply">
+            <option>within 1 working hour</option><option selected>within 2 working hours</option><option>the same working day</option><option>within 1 working day</option>
+          </select>
+          <label for="b-privacy">Link to your privacy notice</label>
+          <input id="b-privacy" inputmode="url" autocapitalize="off" required placeholder="e.g. yourbusiness.co.uk/privacy">
+          <p class="muted">Customers see this link in every first reply. It's a legal requirement.</p>
+          <label for="b-phone">Business phone (optional)</label>
+          <input id="b-phone" type="tel" autocomplete="tel">
+          <label for="b-email">Business email (optional)</label>
+          <input id="b-email" type="email">
+          <label for="b-web">Website (optional)</label>
+          <input id="b-web" inputmode="url" autocapitalize="off" placeholder="e.g. yourbusiness.co.uk">
+          <label for="b-vat">VAT</label>
+          <select id="b-vat"><option value="not_registered">Not VAT registered</option><option value="inclusive">Prices include VAT</option><option value="exclusive">Prices are plus VAT</option></select>
+        </fieldset>
+        <fieldset>
+          <legend>Your services and prices</legend>
+          <p class="muted">Only prices you're happy for Sevari to quote. If it depends, choose "price on inspection".</p>
+          <div id="services"></div>
+          <button type="button" class="ghost" id="add-service">Add another service</button>
+        </fieldset>
+        <fieldset>
+          <legend>Opening hours</legend>
+          <div id="hours"></div>
+        </fieldset>
+        <fieldset>
+          <legend>Where you work</legend>
+          <label for="a-codes">Postcodes you cover</label>
+          <input id="a-codes" required placeholder="e.g. CH1, CH2, CH65, or a whole area like CH">
+          <label for="a-desc">Describe the area</label>
+          <input id="a-desc" required maxlength="300" placeholder="e.g. Chester and Ellesmere Port">
+        </fieldset>
+        <fieldset>
+          <legend>Your cancellation policy (optional)</legend>
+          <textarea id="p-cancel" rows="2" maxlength="2000"></textarea>
+        </fieldset>
+        <button type="submit">Next: check what Sevari understood</button>
+      </form>
+
+      <div id="review" class="card" hidden>
+        <h3>Check and confirm</h3>
+        <p id="review-summary"></p>
+        <ul id="regulated" class="warn-list"></ul>
+        <ol id="records" class="list"></ol>
+        <div class="row"><button type="button" id="confirm-records">These are right: confirm</button><button type="button" class="ghost" id="edit-answers">Change my answers</button></div>
+      </div>
+
+      <div id="connect" class="card" hidden>
+        <h3>Connect your website</h3>
+        <p class="muted">Sevari adds an enquiry form to your website. Customers' messages come straight to Sevari.</p>
+        <form id="channel-form">
+          <label for="c-site">Your website address</label>
+          <input id="c-site" inputmode="url" autocapitalize="off" required placeholder="e.g. yourbusiness.co.uk">
+          <button type="submit">Create my enquiry form</button>
+        </form>
+        <div id="snippet-box" hidden>
+          <label for="snippet">Copy this into your website, where the form should appear</label>
+          <textarea id="snippet" rows="8" readonly></textarea>
+          <div class="row"><button type="button" id="copy-snippet" class="ghost">Copy</button><button type="button" id="test-channel">Send a test message</button></div>
+          <p id="test-code" class="callout" hidden></p>
+        </div>
+        <ul id="channel-list" class="list"></ul>
+      </div>
+
+      <div id="golive" class="card" hidden>
+        <h3>Ready to go live?</h3>
+        <ul id="checklist" class="checklist"></ul>
+        <div class="row"><button type="button" id="refresh-checklist" class="ghost">Check again</button><button type="button" id="go-live">Go live</button></div>
+      </div>
+    </section>
   </main>
+
   <template id="question-tpl">
     <li class="card question">
       <h3 class="q-title"></h3>
@@ -47,6 +157,18 @@
         <div class="row"><button type="submit">Send my version</button><button type="button" class="ghost cancel">Cancel</button></div>
       </form>
     </li>
+  </template>
+  <template id="service-tpl">
+    <div class="service">
+      <label>Service name <input class="s-name" required maxlength="120" placeholder="e.g. Drain unblocking"></label>
+      <label>Words customers use for it (optional, separated by commas) <input class="s-words" placeholder="e.g. blocked drain, sink won't drain"></label>
+      <label>Price <select class="s-basis">
+        <option value="on_inspection">Price on inspection</option><option value="fixed">Fixed price</option><option value="from">From</option><option value="range">Range</option><option value="per_hour">Per hour</option><option value="call_out">Call-out charge</option>
+      </select></label>
+      <div class="row prices"><label>£ <input class="s-pounds" type="number" min="0" step="0.01" inputmode="decimal"></label><label class="s-max-wrap">to £ <input class="s-max" type="number" min="0" step="0.01" inputmode="decimal"></label></div>
+      <label class="inline"><input class="s-emergency" type="checkbox"> Emergency work</label>
+      <button type="button" class="ghost s-remove">Remove</button>
+    </div>
   </template>
   <script src="/app/app.js" type="module"></script>
 </body>

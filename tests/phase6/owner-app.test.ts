@@ -39,16 +39,16 @@ it.skipIf(!process.env['PW_PATH'])('works end to end in a real browser at phone 
   const errors: string[] = [];
   page.on('pageerror', (e: Error) => errors.push(e.message));
   page.on('console', (msg: { type(): string; text(): string }) => { if (msg.type() === 'error') errors.push(msg.text()); });
+  // Signed in already (the sign-in link flow has its own browser test below).
+  await page.addInitScript((t: string) => (globalThis as unknown as { localStorage: { setItem(k: string, v: string): void } }).localStorage.setItem('sevari.session', t), token);
   await page.goto('http://127.0.0.1:4777/app');
-  await page.fill('#token', token);
-  await page.click('#signin-form button');
-  await page.waitForSelector('.question');
+  await page.waitForSelector('.question', { timeout: 8000 }).catch((e: Error) => { throw new Error(`${e.message} | page errors: ${errors.join(' / ')}`); });
   if (process.env['SHOT_DIR']) await page.screenshot({ path: process.env['SHOT_DIR'] + '/owner-inbox.png', fullPage: true });
   x.clock.advance(10_000);
   await page.click('.question .q-actions button:first-child');
   await page.waitForFunction(() => (globalThis as unknown as { document: { querySelector(s: string): { textContent: string | null } | null } }).document.querySelector('#status')?.textContent?.includes('Approved'));
   await x.drain();
-  await page.click('#refresh');
+  await page.click('[data-go="inbox"]');
   await page.waitForFunction(() => (globalThis as unknown as { document: { querySelector(s: string): { textContent: string | null } | null } }).document.querySelector('#notes')?.textContent?.includes('Sent to the customer'));
   if (process.env['SHOT_DIR']) await page.screenshot({ path: process.env['SHOT_DIR'] + '/owner-inbox-after.png', fullPage: true });
   expect(errors).toEqual([]);

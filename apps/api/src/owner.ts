@@ -14,6 +14,7 @@ import { withTenant, type Db } from '@sevari/db';
 import { answer, type ConsumerRegistry } from '@sevari/hitl';
 import { authenticate, platformDecision, type Credential } from '@sevari/identity';
 import { downloadCopy } from '@sevari/privacy';
+import { signOut } from '@sevari/accounts';
 
 export interface OwnerDeps {
   readonly db: Db;
@@ -42,6 +43,7 @@ const PUBLIC_DIR = join(import.meta.dirname, '..', 'public');
 /** The owner app's static files (Phase 6 inbox). Same-origin only: no third-party scripts, fonts or trackers. */
 const APP_FILES: Readonly<Record<string, { file: string; type: string }>> = {
   '/app': { file: 'app.html', type: 'text/html; charset=utf-8' },
+  '/app/': { file: 'app.html', type: 'text/html; charset=utf-8' },
   '/app/app.js': { file: 'app.js', type: 'text/javascript; charset=utf-8' },
   '/app/app.css': { file: 'app.css', type: 'text/css; charset=utf-8' },
   '/app/manifest.webmanifest': { file: 'manifest.webmanifest', type: 'application/manifest+json' },
@@ -99,6 +101,26 @@ export function registerOwnerRoutes(app: FastifyInstance, deps: OwnerDeps): void
       ...(body.data.detail ? { detail: body.data.detail } : {}),
     }));
     return reply.code(r.accepted ? 200 : 409).send(r.accepted ? { accepted: true, ack: r.ack, ...(r.outcome ? { outcome: r.outcome } : {}) } : { accepted: false, reason: r.reason, ack: r.ack });
+  });
+
+  app.post('/v1/owner/signout', async (req, reply) => {
+    const presented = bearer(req);
+    const cred = await authenticate(deps.db, deps.clock, presented);
+    if (!cred || cred.kind !== 'user' || !presented) return reply.code(204).send();
+    await withTenant(deps.db, cred.scope, (tx) => signOut(tx, cred.userId, presented));
+    return reply.code(204).send();
+  });
+
+  /** Who is signed in, for the app's header: business name, status and the person's role. */
+  app.get('/v1/owner/me', async (req, reply) => {
+    const cred = await authenticate(deps.db, deps.clock, bearer(req));
+    if (!cred) return reply.code(401).send({ error: 'sign in required' });
+    if (cred.kind !== 'user') return reply.code(403).send({ error: 'operator credentials cannot act for a business' });
+    return withTenant(deps.db, cred.scope, async (tx) => {
+      const t = await tx.selectFrom('tenants').select(['display_name', 'status']).where('id', '=', cred.scope.tenantId).executeTakeFirstOrThrow();
+      const u = await tx.selectFrom('users').select('display_name_enc').where('id', '=', cred.userId).executeTakeFirstOrThrow();
+      return { business: t.display_name, status: t.status, role: cred.role, name: await deps.keyring.openText(tx, { table: 'users', column: 'display_name_enc', rowId: cred.userId }, u.display_name_enc) };
+    });
   });
 
   app.post<{ Params: { id: string } }>('/v1/owner/notifications/:id/read', async (req, reply) => {

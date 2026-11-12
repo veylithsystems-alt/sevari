@@ -28,7 +28,7 @@ export default tseslint.config(
   {
     // The owner app runs in the browser (same-origin only, strict CSP).
     files: ['apps/api/public/**/*.js'],
-    languageOptions: { globals: { document: 'readonly', sessionStorage: 'readonly', fetch: 'readonly', setInterval: 'readonly' } },
+    languageOptions: { globals: { document: 'readonly', window: 'readonly', history: 'readonly', location: 'readonly', sessionStorage: 'readonly', localStorage: 'readonly', fetch: 'readonly', setInterval: 'readonly', setTimeout: 'readonly', FormData: 'readonly', crypto: 'readonly', URLSearchParams: 'readonly' } },
   },
   {
     files: ['**/test/**/*.ts', 'tests/**/*.ts', 'scripts/**/*.ts', 'eval/**/*.ts'],

@@ -22,3 +22,39 @@ input, textarea { width: 100%; font: inherit; padding: 10px; border-radius: 8px;
 .notes .failure .kind, .notes .alert .kind, .notes .warning .kind { color: var(--warn); }
 .notes .outcome .kind { color: var(--ok); }
 .status { min-height: 1.5em; font-weight: 600; }
+.skip { position: absolute; left: -9999px; }
+.skip:focus { left: 8px; top: 8px; background: var(--card); color: var(--ink); padding: 8px; z-index: 2; }
+.biz { font-weight: 400; font-size: 16px; opacity: .9; }
+nav { display: flex; gap: 6px; flex-wrap: wrap; }
+.top nav button { min-height: 40px; padding: 6px 12px; color: var(--brand-ink); border-color: color-mix(in srgb, var(--brand-ink) 40%, transparent); }
+fieldset { border: 0; padding: 0; margin: 0 0 20px; }
+legend { font-weight: 700; font-size: 18px; margin-bottom: 4px; }
+select { width: 100%; font: inherit; padding: 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+label.inline { display: inline-flex; gap: 6px; align-items: center; font-weight: 400; margin: 4px 12px 4px 0; }
+label.inline input[type=checkbox], .check input { width: auto; min-width: 22px; min-height: 22px; }
+.check { display: flex; gap: 8px; align-items: flex-start; }
+.service { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin: 8px 0; }
+.day { align-items: center; border-bottom: 1px solid var(--line); padding: 6px 0; }
+.dayname { min-width: 96px; font-weight: 600; }
+.day input[type=time] { width: auto; }
+.steps { display: flex; flex-wrap: wrap; gap: 6px; padding: 0; list-style: none; counter-reset: s; margin: 8px 0 16px; }
+.steps li { counter-increment: s; font-size: 14px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.steps li::before { content: counter(s) ". "; }
+.steps li.current { border-color: var(--brand); color: var(--ink); font-weight: 700; }
+.record { border-bottom: 1px solid var(--line); padding: 10px 0; }
+.checklist { list-style: none; padding: 0; }
+.checklist li { padding: 6px 0; }
+.checklist .todo { color: var(--warn); }
+.checklist .ok { color: var(--ok); }
+.warn-list li { color: var(--warn); }
+.callout { padding: 12px; border-radius: 8px; background: color-mix(in srgb, var(--brand) 10%, transparent); font-weight: 600; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+textarea[readonly] { font-family: ui-monospace, monospace; font-size: 13px; }
+.top { flex-wrap: wrap; gap: 8px; }
+.top h1 { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 520px) { .top nav { width: 100%; } .top nav button { flex: 1; } }
+[hidden] { display: none !important; }
+.day { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; }
+.day .dayname { grid-column: 1; }
+.day label.inline { margin: 0; white-space: nowrap; }
+.day input[type=time] { max-width: 8em; padding: 6px; }

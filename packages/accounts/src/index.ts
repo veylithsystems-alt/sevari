@@ -98,7 +98,7 @@ async function signInMail(deps: AccountDeps, tx: TenantTx, to: string, members: 
       member_tenant_id: m.member_tenant_id, member_user_id: m.member_user_id, issued_at: deps.clock.now(), expires_at: new Date(deps.clock.nowMs() + SIGNIN_TTL_MS),
     }).execute();
     const name = await withTenant(deps.db, { tenantId: tenantId(m.member_tenant_id), region: regionCode(tx.scope.region) }, (mt) => mt.selectFrom('tenants').select('display_name').where('id', '=', m.member_tenant_id).executeTakeFirst());
-    lines.push(`${name?.display_name ?? 'Your business'}: ${deps.publicBaseUrl}/app/#signin=${t.full}`);
+    lines.push(`${name?.display_name ?? 'Your business'}: ${deps.publicBaseUrl}/app#signin=${t.full}`);
   }
   const intro = kind === 'already_registered'
     ? 'Someone (hopefully you) tried to sign up to Sevari with this email address, but it already has an account. To sign in instead, use this link:'
@@ -144,7 +144,7 @@ export async function requestSignup(deps: AccountDeps, input: SignupInput): Prom
     }).execute();
     await queueAccountMail(deps, tx, {
       kind: 'signup_verify', to: email, subject: 'Confirm your email to start with Sevari',
-      text: `Hello ${name},\n\nThanks for signing ${business} up to Sevari. Please confirm this is your email address:\n\n${deps.publicBaseUrl}/app/#signup=${t.full}\n\nThe link works once, within 24 hours. Then you can set up your business in about ten minutes. If you didn't sign up, ignore this email and these details are deleted within a day.\n\nSevari, by Veylith`,
+      text: `Hello ${name},\n\nThanks for signing ${business} up to Sevari. Please confirm this is your email address:\n\n${deps.publicBaseUrl}/app#signup=${t.full}\n\nThe link works once, within 24 hours. Then you can set up your business in about ten minutes. If you didn't sign up, ignore this email and these details are deleted within a day.\n\nSevari, by Veylith`,
     });
     // Which terms they agreed to is evidence (§59): kept with the request's audit record.
     await appendAudit(tx, { type: 'signup.requested', actor: { kind: 'system' }, subject: `signup:${id}`, payload: { terms_version: input.termsVersion } });

@@ -6,9 +6,7 @@
  */
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { exchangeSignIn, requestSignIn, requestSignup, signOut, verifySignup, type AccountDeps } from '@sevari/accounts';
-import { authenticate } from '@sevari/identity';
-import { withTenant } from '@sevari/db';
+import { exchangeSignIn, requestSignIn, requestSignup, verifySignup, type AccountDeps } from '@sevari/accounts';
 import type { RateLimiter } from './rate-limit.ts';
 
 export interface SignupTerms {
@@ -40,7 +38,6 @@ const json = (req: FastifyRequest): unknown => {
     return null;
   }
 };
-const bearer = (req: FastifyRequest) => /^Bearer (.+)$/.exec(req.headers.authorization ?? '')?.[1];
 const CHECK_EMAIL = 'Check your email. If the address can be used, a link is on its way. It may take a minute.';
 
 export function registerAccountRoutes(app: FastifyInstance, deps: AccountRouteDeps): void {
@@ -88,25 +85,5 @@ export function registerAccountRoutes(app: FastifyInstance, deps: AccountRouteDe
     if (limited(req, 'verify')) return reply.code(429).header('retry-after', '60').send({ error: 'Too many tries. Please wait a minute.' });
     const r = await exchangeSignIn(deps, body.data.token);
     return r ? reply.send({ session: r.session }) : reply.code(410).send({ error: 'This sign-in link has expired or been used. Please ask for a new one.' });
-  });
-
-  app.post('/v1/owner/signout', async (req, reply) => {
-    const presented = bearer(req);
-    const cred = await authenticate(deps.db, deps.clock, presented);
-    if (!cred || cred.kind !== 'user' || !presented) return reply.code(204).send();
-    await withTenant(deps.db, cred.scope, (tx) => signOut(tx, cred.userId, presented));
-    return reply.code(204).send();
-  });
-
-  /** Who is signed in, for the app's header: business name, status and the person's role. */
-  app.get('/v1/owner/me', async (req, reply) => {
-    const cred = await authenticate(deps.db, deps.clock, bearer(req));
-    if (!cred) return reply.code(401).send({ error: 'sign in required' });
-    if (cred.kind !== 'user') return reply.code(403).send({ error: 'operator credentials cannot act for a business' });
-    return withTenant(deps.db, cred.scope, async (tx) => {
-      const t = await tx.selectFrom('tenants').select(['display_name', 'status']).where('id', '=', cred.scope.tenantId).executeTakeFirstOrThrow();
-      const u = await tx.selectFrom('users').select('display_name_enc').where('id', '=', cred.userId).executeTakeFirstOrThrow();
-      return { business: t.display_name, status: t.status, role: cred.role, name: await deps.keyring.openText(tx, { table: 'users', column: 'display_name_enc', rowId: cred.userId }, u.display_name_enc) };
-    });
   });
 }

@@ -2,6 +2,8 @@
  * Public HTTP surface for one cell. Phase 2: inbound channel endpoints and health.
  * Every inbound request is persisted encrypted and queued before the 202 is returned (§5.2).
  */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import type { ChannelId } from '@sevari/channels';
 import { findEndpoint } from '@sevari/db';
@@ -35,7 +37,7 @@ function securityHeaders(reply: FastifyReply): void {
   reply.header('x-content-type-options', 'nosniff');
   reply.header('referrer-policy', 'no-referrer');
   reply.header('strict-transport-security', 'max-age=63072000; includeSubDomains');
-  reply.header('cache-control', 'no-store');
+  if (!reply.hasHeader('cache-control')) reply.header('cache-control', 'no-store');
 }
 
 export function buildServer(deps: ServerDeps): FastifyInstance {
@@ -53,6 +55,9 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   });
 
   app.get('/health/live', async () => ({ status: 'ok' }));
+  // The script a business puts on its own website next to its enquiry form. No cookies, no tracking.
+  app.get('/embed/form.js', async (_req, reply) => reply.type('text/javascript; charset=utf-8').header('cache-control', 'public, max-age=3600')
+    .header('cross-origin-resource-policy', 'cross-origin').send(await readFile(join(import.meta.dirname, '..', 'public', 'embed-form.js'))));
   app.get('/health/ready', async (_req, reply) => (await deps.ready()) ? { status: 'ready' } : reply.code(503).send({ status: 'not ready' }));
 
   // CORS preflight for website forms: allowed only for the form's own configured origins.
@@ -95,7 +100,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
   if (deps.owner) {
     registerOwnerRoutes(app, deps.owner);
-    registerOnboardingRoutes(app, deps.owner);
+    registerOnboardingRoutes(app, { ...deps.owner, publicBaseUrl: deps.publicBaseUrl });
     registerPortalRoutes(app, deps.owner);
     if (deps.accounts) registerAccountRoutes(app, { db: deps.owner.db, keyring: deps.owner.keyring, clock: deps.owner.clock, publicBaseUrl: deps.publicBaseUrl, region: deps.accounts.region, limiter: deps.limiter, ...(deps.accounts.signup ? { signup: deps.accounts.signup } : {}) });
   }

@@ -93,3 +93,6 @@ Cross-business suppression (DEV-018) is a known gap with a plan: it is built bef
 | I-38 | Sign-up and sign-in answer the same way whether or not an address has an account, and send at most a few emails to any address an hour, so the form can't be used to find out who uses Sevari or to flood someone's inbox | Built, tested |
 | I-39 | Sign-up records which version of the terms each business agreed to, and is refused if the terms changed while the page was open | Built, tested |
 | I-40 | Account emails carry a sign-in link, so they are encrypted while waiting and destroyed once handed to the email provider | Built, tested |
+| I-41 | The owner sees every drafted record in plain English before confirming, not just a count, so a confirmation always covers words they have read (I5) | Built, tested (browser) |
+| I-42 | The website enquiry form is a copy-and-paste snippet with a tiny script: no cookies, no tracking, nothing from anywhere else; a double-click can't send an enquiry twice | Built, tested |
+| I-43 | Owners can type "mysite.co.uk"; Sevari adds the secure https themselves rather than refusing the address | Built, tested (browser) |
