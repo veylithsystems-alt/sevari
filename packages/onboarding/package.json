@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "dependencies": {
     "@sevari/audit": "workspace:*",
     "@sevari/clock": "workspace:*",
@@ -13,6 +15,7 @@
     "@sevari/grounding": "workspace:*",
     "@sevari/hitl": "workspace:*",
     "@sevari/knowledge": "workspace:*",
+    "@sevari/metrics": "workspace:*",
     "@sevari/templates": "workspace:*",
     "@sevari/verticals": "workspace:*",
     "yaml": "2.8.1",

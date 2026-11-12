@@ -10,6 +10,7 @@ import type { Clock } from '@sevari/clock';
 import type { TenantKeyring } from '@sevari/crypto';
 import type { TenantTx } from '@sevari/db';
 import { ask, digestOf, notify, ownerOf, type Consumer, type ConsumerRegistry } from '@sevari/hitl';
+import { scheduleBrief } from '@sevari/metrics';
 import { activate, confirmPack, goLiveChecklist, type CellLive } from './golive.ts';
 
 export interface OnboardingWorkerDeps {
@@ -92,6 +93,8 @@ export function onboardingConsumers(deps: OnboardingWorkerDeps): Record<string, 
         const mode = ctx.response === 'shadow' ? 'shadow' as const : 'active' as const;
         const r = await activate(live(deps), ctx.tx, { mode, inputId: ctx.inputId, userId: ctx.responderId });
         if (!r.ok) return { status: 'failed', effectKind: 'tenant.go_live', effectRef: ref, outcomeText: `Not live yet: something changed since you were asked.\n- ${r.missing.join('\n- ')}` };
+        // The owner's briefs start now (§78): 07:00 and 19:00, their time.
+        await scheduleBrief(ctx.tx, deps.clock.nowMs());
         return {
           status: 'done', effectKind: 'tenant.go_live', effectRef: ref,
           outcomeText: mode === 'active'

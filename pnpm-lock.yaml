@@ -176,6 +176,9 @@ importers:
       '@sevari/knowledge':
         specifier: workspace:*
         version: link:../../packages/knowledge
+      '@sevari/metrics':
+        specifier: workspace:*
+        version: link:../../packages/metrics
       '@sevari/onboarding':
         specifier: workspace:*
         version: link:../../packages/onboarding
@@ -589,6 +592,9 @@ importers:
       '@sevari/knowledge':
         specifier: workspace:*
         version: link:../knowledge
+      '@sevari/metrics':
+        specifier: workspace:*
+        version: link:../metrics
       '@sevari/templates':
         specifier: workspace:*
         version: link:../templates

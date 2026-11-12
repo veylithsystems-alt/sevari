@@ -15,6 +15,7 @@ import { answer, type ConsumerRegistry } from '@sevari/hitl';
 import { authenticate, platformDecision, type Credential } from '@sevari/identity';
 import { downloadCopy } from '@sevari/privacy';
 import { signOut } from '@sevari/accounts';
+import { latestBrief } from '@sevari/metrics';
 
 export interface OwnerDeps {
   readonly db: Db;
@@ -121,6 +122,14 @@ export function registerOwnerRoutes(app: FastifyInstance, deps: OwnerDeps): void
       const u = await tx.selectFrom('users').select('display_name_enc').where('id', '=', cred.userId).executeTakeFirstOrThrow();
       return { business: t.display_name, status: t.status, role: cred.role, name: await deps.keyring.openText(tx, { table: 'users', column: 'display_name_enc', rowId: cred.userId }, u.display_name_enc) };
     });
+  });
+
+  /** The latest morning brief or evening summary (§78), for the top of the inbox. */
+  app.get('/v1/owner/brief', async (req, reply) => {
+    const cred = await userOnly(req, reply);
+    if (!cred) return reply;
+    const b = await withTenant(deps.db, cred.scope, (tx) => latestBrief(deps, tx));
+    return b ? { kind: b.kind, period_end: b.periodEnd, waiting: b.waiting, lines: b.lines.map((l) => ({ section: l.section, text: l.text })) } : { kind: null };
   });
 
   app.post<{ Params: { id: string } }>('/v1/owner/notifications/:id/read', async (req, reply) => {

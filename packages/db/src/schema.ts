@@ -437,7 +437,7 @@ export interface ErasureLogTable extends Meta, Tenant {
 export interface RetentionRunsTable extends Meta, Tenant { ran_at: Date; findings: ColumnType<Record<string, unknown>, string, never> }
 
 export interface OwnerReportsTable extends Meta, Tenant {
-  kind: 'weekly';
+  kind: 'weekly' | 'morning' | 'evening';
   period_start: Date;
   period_end: Date;
   metrics: ColumnType<Record<string, unknown>, string, never>;

@@ -120,7 +120,23 @@ function renderQuestion(q) {
   return node;
 }
 
+async function loadBrief() {
+  const b = await bodyOf(await api('/v1/owner/brief'));
+  $('#brief').hidden = !b.kind;
+  if (!b.kind) return;
+  const at = new Date(b.period_end).toLocaleString('en-GB', { weekday: 'long', hour: '2-digit', minute: '2-digit' });
+  $('#brief-title').textContent = `${b.kind === 'morning' ? 'Morning brief' : 'Evening summary'} · ${at}`;
+  const order = ['waiting', 'check', 'activity', 'outcomes'];
+  $('#brief-lines').replaceChildren(...[...b.lines].sort((x, y) => order.indexOf(x.section) - order.indexOf(y.section)).map((l) => {
+    const li = document.createElement('li');
+    li.className = `brief-${l.section}`;
+    li.textContent = l.text;
+    return li;
+  }));
+}
+
 async function loadInbox() {
+  loadBrief().catch(() => {});
   const res = await api('/v1/owner/inbox');
   if (res.status === 403) { say('This sign-in can’t act for a business.'); return; }
   const data = await res.json();

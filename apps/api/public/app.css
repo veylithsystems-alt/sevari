@@ -58,3 +58,6 @@ textarea[readonly] { font-family: ui-monospace, monospace; font-size: 13px; }
 .day .dayname { grid-column: 1; }
 .day label.inline { margin: 0; white-space: nowrap; }
 .day input[type=time] { max-width: 8em; padding: 6px; }
+.brief li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.brief .brief-waiting { font-weight: 600; }
+.brief .brief-check { color: var(--warn); }

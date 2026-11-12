@@ -96,3 +96,5 @@ Cross-business suppression (DEV-018) is a known gap with a plan: it is built bef
 | I-41 | The owner sees every drafted record in plain English before confirming, not just a count, so a confirmation always covers words they have read (I5) | Built, tested (browser) |
 | I-42 | The website enquiry form is a copy-and-paste snippet with a tiny script: no cookies, no tracking, nothing from anywhere else; a double-click can't send an enquiry twice | Built, tested |
 | I-43 | Owners can type "mysite.co.uk"; Sevari adds the secure https themselves rather than refusing the address | Built, tested (browser) |
+| I-44 | The brief's email says only how many things need the owner, never what they are, so no customer detail travels by email; the brief itself stays in the app | Built, tested |
+| I-45 | Briefs start the moment a business goes live, and the 7am/7pm times follow the business's own clock changes | Built, tested |

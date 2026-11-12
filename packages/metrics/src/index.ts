@@ -139,3 +139,4 @@ export async function sendWeeklyReport(deps: { keyring: TenantKeyring; clock: Cl
   await scheduleWeeklyReport(tx, periodEnd + 1);
   return { id, metrics: m };
 }
+export * from './brief.ts';

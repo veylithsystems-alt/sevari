@@ -11,8 +11,9 @@
  *   lifecycle.effect → ask/notify the owner, close a booking         journey.ts
  *   booking.release_hold → backstop: a lapsed hold frees its slot   bookings.ts
  *   account_mail.send → Veylith's sign-up/sign-in emails           @sevari/accounts
+ *   brief.owner      → the 07:00 and 19:00 owner briefs             @sevari/metrics
  */
-import { ACCOUNT_MAIL_JOB, sendAccountMail } from '@sevari/accounts';
+import { ACCOUNT_MAIL_JOB, mailUser, sendAccountMail } from '@sevari/accounts';
 import { appendAudit } from '@sevari/audit';
 import type { Clock } from '@sevari/clock';
 import type { TenantKeyring } from '@sevari/crypto';
@@ -24,7 +25,7 @@ import { dispatch, reconcile, recordReply, type OutboundProvider } from '@sevari
 import { sendAck } from './ack.ts';
 import { DSAR_ERASE_JOB, makeConsumers } from './consumers.ts';
 import { eraseSubject, type ShredRegister } from '@sevari/privacy';
-import { sendWeeklyReport, WEEKLY_REPORT_JOB } from '@sevari/metrics';
+import { BRIEF_JOB, sendBrief, sendWeeklyReport, WEEKLY_REPORT_JOB, type BriefKind } from '@sevari/metrics';
 import { snapshotAt } from '@sevari/knowledge';
 import { inboundHandler, RESPOND_JOB, type ModelDeps } from './inbound.ts';
 import { EFFECT_JOB, TIMER_JOB } from '@sevari/lifecycle';
@@ -115,6 +116,29 @@ export function workerHandlers(deps: WorkerDeps): { handlers: Record<string, Job
     [BILLING_SUSPEND_JOB]: suspendHandler({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers }),
     [ACCOUNT_MAIL_JOB]: { scoped: (scope, p) => sendAccountMail({ db: deps.db, keyring: deps.keyring, clock: deps.clock, provider: deps.provider }, scope, String(p['mail_id'])) },
     [FINAL_BILL_JOB]: finalBillHandler({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers }),
+    [BRIEF_JOB]: {
+      scoped: async (scope, p) => {
+        const at = Number(p['at']);
+        const kind: BriefKind = p['kind'] === 'evening' ? 'evening' : 'morning';
+        // Never before its time, whatever the queue's timing says.
+        if (deps.clock.nowMs() < at) throw new Error('brief not due yet');
+        const r = await withTenant(deps.db, scope, async (tx) => {
+          const t = await tx.selectFrom('tenants').select(['display_name', 'status']).where('id', '=', scope.tenantId).executeTakeFirstOrThrow();
+          if (t.status !== 'active' && t.status !== 'shadow') return null;
+          return sendBrief(deps, tx, kind, at, t.display_name);
+        });
+        if (!r?.ownerId) return r ? 'shown' : 'not_live';
+        const busy = r.brief.waiting > 0 || r.brief.lines.some((l) => l.section === 'check');
+        if (!busy || !deps.publicBaseUrl) return 'shown';
+        // A short email with no customer details in it: the brief itself stays in the app.
+        const what = r.brief.waiting ? `${r.brief.waiting} ${r.brief.waiting === 1 ? 'thing needs' : 'things need'} your answer` : 'Something needs checking';
+        await mailUser({ db: deps.db, keyring: deps.keyring, clock: deps.clock, region: scope.region }, scope, r.ownerId, {
+          kind: 'brief_ready', subject: `Your ${kind} brief: ${what}`,
+          text: `${kind === 'morning' ? 'Good morning.' : 'Good evening.'} ${what} in Sevari.\n\nOpen your brief: ${deps.publicBaseUrl}/app\n\nSevari, by Veylith`,
+        }).catch(() => null);
+        return 'shown_and_emailed';
+      },
+    },
     [WEEKLY_REPORT_JOB]: async (tx, p) => {
       // Never report a week that hasn't finished, whatever the queue's timing says.
       if (deps.clock.nowMs() < Number(p['period_end'])) throw new Error('week not finished yet');
