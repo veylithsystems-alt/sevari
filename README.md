@@ -8,7 +8,7 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 
 ## For Dan: where things stand (plain English)
 
-**Last updated:** 11 November 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.13
+**Last updated:** 12 November 2026 · **Branch:** `claude/sevari-core-build` · **Contract:** v1.13
 
 **Status: build in progress.** Under contract Part J there are three separate milestones: *build-complete* (code and tests done), *production-approved* (deployment, recovery, security, support, legal documents all proven: [`docs/readiness/`](docs/readiness/README.md)), and *commercially launched* (pilots prove the product is worth paying for: the Value Gate). Passing automated tests is **not** evidence that Sevari is ready for paying customers.
 
@@ -142,6 +142,8 @@ Built to the binding build contract in [`docs/BUILD_CONTRACT.md`](docs/BUILD_CON
 - **Handing a case to someone else** (a subcontractor, specialist, partner firm, insurer, regulator or debt collector) always needs the owner's approval. It names who, why, on what legal basis, and exactly which details are shared. The recipient must be an approved supplier or a partner the business has registered. A partner who processes data for them must have a data agreement on record; the database refuses one without it. Refusals are recorded too.
 - **No case is ever left without an owner.** If a team member's login is switched off, their open cases move to the business owner automatically.
 - **Customers get their own private page** from a secure link (it expires after 30 days, and only a scrambled copy is stored). It shows their bookings and invoices, and has two one-click buttons: "stop marketing" and "stop all messages". Both take effect at once and are recorded in the consent record.
+- **Businesses can sign up by themselves.** They type their name, business name and email, and confirm with the link they're emailed. Nothing is kept until they confirm, and unconfirmed details are deleted within a day. Their business is created in set-up mode (nothing goes to customers), and you get a note: "New sign-up". Sign-up stays closed until your customer terms and privacy notice are published (Q-26).
+- **Signing in uses an emailed link**: it works once, for 15 minutes, and there are no passwords. Signing out ends the session at once. Building this found a real security gap, now fixed: a cancelled login key still worked.
 - Sevari can't connect to any outside service unless you've approved that supplier. This is enforced three ways: in the code, by a gatekeeper process, and by the server's firewall (proven by a test). The supplier list (processor register) is generated automatically and currently lists one approved supplier: Brevo, for email.
 
 **Your decisions of 14 October (contract v1.12, Part L):**

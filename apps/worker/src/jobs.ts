@@ -10,7 +10,9 @@
  *   lifecycle.timer  → a journey's timer, if still where it was set  journey.ts
  *   lifecycle.effect → ask/notify the owner, close a booking         journey.ts
  *   booking.release_hold → backstop: a lapsed hold frees its slot   bookings.ts
+ *   account_mail.send → Veylith's sign-up/sign-in emails           @sevari/accounts
  */
+import { ACCOUNT_MAIL_JOB, sendAccountMail } from '@sevari/accounts';
 import { appendAudit } from '@sevari/audit';
 import type { Clock } from '@sevari/clock';
 import type { TenantKeyring } from '@sevari/crypto';
@@ -111,6 +113,7 @@ export function workerHandlers(deps: WorkerDeps): { handlers: Record<string, Job
     [BILLING_RUN_JOB]: billingRunHandler({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers, ...(deps.payments ? { payments: deps.payments } : {}) }),
     [BILLING_DUNNING_JOB]: (tx, p) => dunningCheck({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers }, tx, p),
     [BILLING_SUSPEND_JOB]: suspendHandler({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers }),
+    [ACCOUNT_MAIL_JOB]: { scoped: (scope, p) => sendAccountMail({ db: deps.db, keyring: deps.keyring, clock: deps.clock, provider: deps.provider }, scope, String(p['mail_id'])) },
     [FINAL_BILL_JOB]: finalBillHandler({ db: deps.db, keyring: deps.keyring, clock: deps.clock, consumers }),
     [WEEKLY_REPORT_JOB]: async (tx, p) => {
       // Never report a week that hasn't finished, whatever the queue's timing says.

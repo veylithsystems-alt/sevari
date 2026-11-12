@@ -26,6 +26,7 @@
     "@sevari/outbound": "workspace:*",
     "@sevari/privacy": "workspace:*",
     "@sevari/templates": "workspace:*",
-    "@sevari/verticals": "workspace:*"
+    "@sevari/verticals": "workspace:*",
+    "@sevari/accounts": "workspace:*"
   }
 }

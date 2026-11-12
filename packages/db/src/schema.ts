@@ -670,6 +670,17 @@ export interface TenantOffboardingsTable extends Meta, Tenant {
   exported_at: Date | null; erasure_decision_id: string | null; certificate: ColumnType<Record<string, unknown> | null, string | null | undefined, string | null>; erased_at: Date | null;
 }
 export interface PortalTokensTable extends Meta, Tenant { contact_id: string; prefix: string; token_hash: Buffer; expires_at: Date; last_used_at: Date | null }
+export interface SignupRequestsTable extends Meta, Tenant {
+  prefix: string; token_hash: Buffer; email_enc: Buffer | null; email_bidx: Buffer; contact_name_enc: Buffer | null; business_name_enc: Buffer | null;
+  status: Generated<'pending' | 'verifying' | 'completed' | 'expired'>; new_tenant_id: string | null; expires_at: Date;
+}
+export interface AccountDirectoryTable extends Meta, Tenant { email_bidx: Buffer; member_tenant_id: string; member_user_id: string }
+export interface LoginLinksTable extends Meta, Tenant { prefix: string; token_hash: Buffer; member_tenant_id: string; member_user_id: string; issued_at: Date; expires_at: Date; used_at: Date | null }
+export type AccountMailKind = 'signup_verify' | 'signin_link' | 'already_registered' | 'brief_ready';
+export interface AccountMailTable extends Meta, Tenant {
+  kind: AccountMailKind; recipient_enc: Buffer | null; subject: string; body_enc: Buffer | null; state: Generated<'pending' | 'sent' | 'failed'>;
+  attempts: Generated<number>; provider_message_id: string | null; last_error: string | null; sent_at: Date | null;
+}
 type ViewOf<T> = { readonly [K in keyof T]: T[K] };
 export type MetricsEnquiryFlowView = ViewOf<{
   tenant_id: string; region: string; enquiry_id: string; received_at: Date; analysed_at: Date; route: string; intent: string; intent_source: string; abstained: boolean;
@@ -682,6 +693,10 @@ export type MetricsUnknownsView = ViewOf<{ tenant_id: string; region: string; an
 export interface Database {
   regions: RegionsTable;
   tenants: TenantsTable;
+  signup_requests: SignupRequestsTable;
+  account_directory: AccountDirectoryTable;
+  login_links: LoginLinksTable;
+  account_mail: AccountMailTable;
   tenant_keys: TenantKeysTable;
   audit_events: AuditEventsTable;
   audit_checkpoints: AuditCheckpointsTable;

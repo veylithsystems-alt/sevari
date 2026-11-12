@@ -11,6 +11,9 @@ importers:
       '@eslint/js':
         specifier: 9.39.1
         version: 9.39.1
+      '@sevari/accounts':
+        specifier: workspace:*
+        version: link:packages/accounts
       '@sevari/api':
         specifier: workspace:*
         version: link:apps/api
@@ -137,6 +140,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@sevari/accounts':
+        specifier: workspace:*
+        version: link:../../packages/accounts
       '@sevari/boot':
         specifier: workspace:*
         version: link:../../packages/boot
@@ -188,6 +194,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@sevari/accounts':
+        specifier: workspace:*
+        version: link:../../packages/accounts
       '@sevari/approvals':
         specifier: workspace:*
         version: link:../../packages/approvals
@@ -248,6 +257,33 @@ importers:
       '@sevari/verticals':
         specifier: workspace:*
         version: link:../../packages/verticals
+
+  packages/accounts:
+    dependencies:
+      '@sevari/audit':
+        specifier: workspace:*
+        version: link:../audit
+      '@sevari/clock':
+        specifier: workspace:*
+        version: link:../clock
+      '@sevari/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@sevari/db':
+        specifier: workspace:*
+        version: link:../db
+      '@sevari/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@sevari/hitl':
+        specifier: workspace:*
+        version: link:../hitl
+      '@sevari/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@sevari/outbound':
+        specifier: workspace:*
+        version: link:../outbound
 
   packages/approvals:
     dependencies:

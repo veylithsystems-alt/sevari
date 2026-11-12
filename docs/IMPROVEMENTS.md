@@ -83,3 +83,13 @@ Cross-business suppression (DEV-018) is a known gap with a plan: it is built bef
 | I-33 | The erasure certificate lists what was kept and why (tax records, with no link to any person), not just what was deleted | Built, tested (F21) |
 | I-34 | Switching off a team member's login hands their open cases to the owner in the same step, so a case can never be left without an owner | Built, tested (T-OFF-1) |
 | I-35 | Customer portal links are stored only as a scrambled copy and expire, and the page loads nothing from anywhere else and runs no scripts | Built, tested |
+
+### Added with sign-up and sign-in
+
+| # | Improvement | Status |
+|---|---|---|
+| I-36 | **Security fix:** building sign-out showed that a revoked login key (or a revoked Veylith operator key) still worked, because sign-in never checked whether it had been revoked. Revoked keys are now refused at the lookup | Built, tested |
+| I-37 | Sign-up keeps nothing until the email is confirmed: the typed details are encrypted, destroyed when used or after 24 hours, and the database refuses a used request that still holds them | Built, tested |
+| I-38 | Sign-up and sign-in answer the same way whether or not an address has an account, and send at most a few emails to any address an hour, so the form can't be used to find out who uses Sevari or to flood someone's inbox | Built, tested |
+| I-39 | Sign-up records which version of the terms each business agreed to, and is refused if the terms changed while the page was open | Built, tested |
+| I-40 | Account emails carry a sign-in link, so they are encrypted while waiting and destroyed once handed to the email provider | Built, tested |

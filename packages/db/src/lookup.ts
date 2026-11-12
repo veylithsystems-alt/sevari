@@ -65,7 +65,7 @@ export async function findUserToken(db: Db, prefix: string): Promise<UserTokenRo
   if (!/^ut_[a-z0-9]{12}$/.test(prefix)) return null;
   return db.transaction().execute(async (trx) => {
     await sql`SELECT set_config('app.user_token_prefix', ${prefix}, true)`.execute(trx);
-    const r = await trx.selectFrom('user_tokens').select(['tenant_id', 'region', 'user_id', 'token_hash', 'expires_at']).where('prefix', '=', prefix).executeTakeFirst();
+    const r = await trx.selectFrom('user_tokens').select(['tenant_id', 'region', 'user_id', 'token_hash', 'expires_at']).where('prefix', '=', prefix).where('status', '=', 'active').executeTakeFirst();
     return r ? { tenantId: tenantId(r.tenant_id), region: regionCode(r.region), userId: r.user_id, tokenHash: r.token_hash, expiresAt: r.expires_at } : null;
   });
 }
@@ -74,7 +74,7 @@ export async function findOperator(db: Db, prefix: string): Promise<{ id: string
   if (!/^op_[a-z0-9]{12}$/.test(prefix)) return null;
   return db.transaction().execute(async (trx) => {
     await sql`SELECT set_config('app.operator_prefix', ${prefix}, true)`.execute(trx);
-    const r = await trx.selectFrom('operators').select(['id', 'token_hash', 'role']).where('prefix', '=', prefix).executeTakeFirst();
+    const r = await trx.selectFrom('operators').select(['id', 'token_hash', 'role']).where('prefix', '=', prefix).where('status', '=', 'active').executeTakeFirst();
     return r ? { id: r.id, tokenHash: r.token_hash, role: r.role } : null;
   });
 }

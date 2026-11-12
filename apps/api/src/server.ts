@@ -6,6 +6,7 @@ import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import type { ChannelId } from '@sevari/channels';
 import { findEndpoint } from '@sevari/db';
 import { receiveInbound, type IntakeDeps } from '@sevari/intake';
+import { registerAccountRoutes, type SignupTerms } from './accounts.ts';
 import { registerOnboardingRoutes } from './onboarding.ts';
 import { registerPortalRoutes } from './portal.ts';
 import { registerOwnerRoutes, type OwnerDeps } from './owner.ts';
@@ -21,6 +22,8 @@ export interface ServerDeps {
   readonly logger?: boolean;
   /** Owner app API (Phase 6/18). Omitted on intake-only nodes. */
   readonly owner?: OwnerDeps & { readonly cellLive?: CellLive };
+  /** Sign-up and sign-in (§81, R-13). `region` is the cell's region; `signup` absent keeps sign-up closed. */
+  readonly accounts?: { readonly region: string; readonly signup?: SignupTerms };
 }
 
 const CHANNELS: ReadonlySet<string> = new Set(['webform', 'email', 'sms', 'api']);
@@ -94,6 +97,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     registerOwnerRoutes(app, deps.owner);
     registerOnboardingRoutes(app, deps.owner);
     registerPortalRoutes(app, deps.owner);
+    if (deps.accounts) registerAccountRoutes(app, { db: deps.owner.db, keyring: deps.owner.keyring, clock: deps.owner.clock, publicBaseUrl: deps.publicBaseUrl, region: deps.accounts.region, limiter: deps.limiter, ...(deps.accounts.signup ? { signup: deps.accounts.signup } : {}) });
   }
   return app;
 }
