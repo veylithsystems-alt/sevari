@@ -8,8 +8,8 @@
 |---|---|
 | Status | approved (approved by Dan Hadfield (founder, Veylith Systems) on 2026-10-28) |
 | Role | processor |
-| Purpose | Transactional email to customers and owners (acknowledgements, approved replies, booking confirmations, data-request links) |
-| Data categories | recipient email address, message text, outbox reference |
+| Purpose | Transactional email to customers and owners (acknowledgements, approved replies, booking confirmations, data-request links); receiving customers' emails to businesses' Sevari addresses (inbound parsing, approved 2026-11-13, ADR email-brevo-inbound) |
+| Data categories | recipient email address, message text, outbox reference, inbound email (sender and recipient addresses, subject, body, signature, headers, attachments) |
 | Data locations | email content and logs: France (OVH) and Belgium (Google Cloud) |
 | Sub-processors | https://www.brevo.com/legal/termsofuse/ (notice: 30 days) |
 | DPA | Brevo Terms of Service, Appendix 3 (Data Processing Agreement), accepted with the account |
@@ -19,4 +19,4 @@
 | ADR | docs/adr/providers/email-brevo.md |
 | Destination tested | not yet |
 | Next review | 2027-10-28 |
-| Unknowns | Does Cloudflare (USA) in the request path need naming in tenants' privacy notices, and is the UK-US data bridge enough? (counsel) |
+| Unknowns | How long does Brevo keep received emails and their attachments, and can they be deleted through the API? Must be confirmed before inbound email is switched on (ADR email-brevo-inbound); Does Cloudflare (USA) in the request path need naming in tenants' privacy notices, and is the UK-US data bridge enough? (counsel) |

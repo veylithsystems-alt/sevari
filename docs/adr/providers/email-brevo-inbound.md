@@ -1,8 +1,8 @@
 # ADR: receiving customer email through Brevo (inbound parsing)
 
-**Status:** Proposed, waiting for Dan's decision (Q-27). The code is built and tested but **switched off**: it does nothing until this ADR is approved and the cell is configured with a receiving domain and a webhook token. Until then, condition 3 of the sending ADR ([`email-brevo.md`](email-brevo.md)) stands: customers' replies go to the business's own mailbox.
+**Status:** Approved by Dan on 13 November 2026, with one condition: before it is switched on, confirm how long Brevo keeps received emails and their attachments, and whether they can be deleted (see Data protection). Recorded in `config/processors.yaml`. It is still switched off in code until the cell is configured with a receiving domain and a webhook token (deployment step, after the condition is met).
 
-## Decision proposed
+## Decision
 Each business that wants it gets its own receiving address on a Sevari receiving subdomain (for example `pats-drains-4k2m9q@in.sevari.co.uk`). Brevo receives the email for that subdomain, strips quoted replies and signatures, and posts it to the cell. Sevari treats it like any other enquiry: acknowledged, analysed, a reply drafted for the owner. Sevari's emails to customers then carry the business's receiving address as Reply-To, so the customer's answer comes straight back into the same conversation.
 
 ## Why
@@ -31,5 +31,8 @@ Each business that wants it gets its own receiving address on a Sevari receiving
 | Erasure | Sevari's copy is erased like any message (per-person key). Brevo's copy depends on the unknown above |
 | Privacy notices | Businesses' privacy notices should say that emails to their Sevari address are received by Brevo for Veylith |
 
-## Decision needed (Dan)
-Approve receiving customer email through Brevo as above, with the retention unknown confirmed first. On approval: the processor register entry gains the receiving purpose and data categories, the receiving subdomain is delegated, the webhook is created with a token from the secrets store, and the cell's config names the receiving domain.
+## Switching it on (after the condition is met)
+1. Confirm Brevo's retention for received emails and record it in `config/processors.yaml` (replacing the unknown).
+2. Delegate the receiving subdomain to Brevo (two MX records).
+3. Create the inbound webhook with a new random token (32+ characters) kept in the secrets store.
+4. Set the receiving domain and token in the cell's settings. Owners can then create their Sevari email address in the app.

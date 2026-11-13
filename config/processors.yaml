@@ -10,8 +10,8 @@ processors:
   - id: brevo
     name: Brevo (Sendinblue SAS)
     role: processor
-    purpose: Transactional email to customers and owners (acknowledgements, approved replies, booking confirmations, data-request links)
-    data_categories: [recipient email address, message text, outbox reference]
+    purpose: Transactional email to customers and owners (acknowledgements, approved replies, booking confirmations, data-request links); receiving customers' emails to businesses' Sevari addresses (inbound parsing, approved 2026-11-13, ADR email-brevo-inbound)
+    data_categories: [recipient email address, message text, outbox reference, inbound email (sender and recipient addresses, subject, body, signature, headers, attachments)]
     data_locations:
       - data: email content and logs
         location: France (OVH) and Belgium (Google Cloud)
@@ -30,4 +30,5 @@ processors:
     review: { status: approved, reviewed_on: "2026-10-28", next_review: "2027-10-28" }
     approval: { approved_by: "Dan Hadfield (founder, Veylith Systems)", approved_on: "2026-10-28", human_input_id: null }
     unknowns:
+      - How long does Brevo keep received emails and their attachments, and can they be deleted through the API? Must be confirmed before inbound email is switched on (ADR email-brevo-inbound)
       - Does Cloudflare (USA) in the request path need naming in tenants' privacy notices, and is the UK-US data bridge enough? (counsel)
